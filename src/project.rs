@@ -239,14 +239,6 @@ pub fn collect_config(path: &Path) -> Result<ProjectConfig, Box<dyn Error>> {
         }
     };
 
-    if config.build.is_none() {
-        panic!("fuck");
-    }
-
-    if config.name.as_ref().expect("cant get config name") == "{{name}}" {
-        panic!("fuck");
-    }
-
     Ok(config)
 }
 

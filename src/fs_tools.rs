@@ -132,6 +132,36 @@ mod test {
     }
 
     #[test]
+    fn test_make_project_templates() {
+        let mut temp = TempSetup::default();
+        let root_buf = temp.setup();
+
+        let proj = make_fake_project(Some(root_buf.clone()));
+
+        let mut main_rs = root_buf.clone();
+        main_rs.push("test_project");
+        main_rs.push("src");
+        main_rs.push("main.rs");
+
+        if let Err(err) = make_project_dirs(&proj) {
+            eprintln!("{}", err);
+            assert!(false, "didn't make template dirs");
+        };
+
+        if let Err(err) = make_project_files(&proj) {
+            eprintln!("{}", err);
+            assert!(false, "didn't make template dirs");
+        };
+
+        if let Err(err) = make_project_templates(&proj) {
+            eprintln!("{}", err);
+            assert!(false, "didn't make templates");
+        };
+
+        assert!(main_rs.exists(), "main rs dose not exists");
+    }
+
+    #[test]
     fn test_root_exits() {
         let mut temp = TempSetup::default();
 
