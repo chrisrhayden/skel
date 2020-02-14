@@ -1,0 +1,13 @@
+test:
+- make test for optional config variables
+- test failures of structs
+
+short term:
+- cli args
+- make from a directory
+    * Project struct from directory
+    * or just copy directory
+
+
+long term:
+- better templating
