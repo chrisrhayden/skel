@@ -20,6 +20,10 @@ fn make_project_files(project: &Project) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn make_project_templates(project: &Project) -> Result<(), Box<dyn Error>> {
+    unimplemented!();
+}
+
 fn io_err_to_new_error(io_err: Box<dyn Error>) -> Result<(), NewRsError> {
     let err_string = format!("{:?}", io_err);
 
@@ -46,6 +50,10 @@ pub fn make_project_tree(project: &Project) -> Result<(), NewRsError> {
     }
 
     if let Err(err) = make_project_files(project) {
+        io_err_to_new_error(err)?;
+    }
+
+    if let Err(err) = make_project_templates(project) {
         io_err_to_new_error(err)
     } else {
         Ok(())

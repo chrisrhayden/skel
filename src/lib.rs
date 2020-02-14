@@ -8,7 +8,7 @@ mod test_utils;
 
 use std::error::Error;
 
-pub use crate::project::{Template, Project, collect_config};
+pub use crate::project::{FileTemplate, Project, collect_config};
 
 use crate::{fs_tools::make_project_tree, system_tools::call_build_script};
 

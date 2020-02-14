@@ -7,11 +7,6 @@ use toml;
 use serde::Deserialize;
 
 use crate::template::template;
-#[derive(Debug, Deserialize)]
-pub struct Template {
-    pub name: String,
-    pub template: String,
-}
 
 // a config to deserialize project files in toml
 #[derive(Debug, Deserialize)]
@@ -20,12 +15,16 @@ pub struct ProjectConfig {
     pub dirs: Vec<String>,
     pub files: Vec<String>,
     pub build: Option<String>,
-    pub templates: Vec<Template>,
+    pub templates: Option<Vec<FileTemplate>>,
 }
 
-// a project struct to eventually use to make the project
-// last should take precedent:
-// default > file config > cli config (this takes precedent)
+#[derive(Debug, Deserialize)]
+pub struct FileTemplate {
+    pub name: String,
+    pub template: String,
+}
+
+// a project struct to eventually use to make the project last should take precedent: default > file config > cli config (this takes precedent)
 #[derive(Debug)]
 pub struct Project {
     // the root, current_dir/given on cli plus name
@@ -38,6 +37,7 @@ pub struct Project {
     pub files: Vec<String>,
     // a build script to make and run
     pub build: Option<String>,
+    pub templates: Option<Vec<FileTemplate>>,
 }
 
 impl Project {
@@ -72,6 +72,7 @@ impl Project {
             dirs: config.dirs,
             files: config.files,
             build: config.build,
+            templates: config.templates,
         }
     }
 
@@ -93,6 +94,20 @@ impl Project {
             .expect("cant covert path to str");
 
         ProjectPathIterator::new(root, &self.name, &self.files)
+    }
+    pub fn template_iter(&self) -> Option<ProjectTemplateIterator> {
+        let root = self
+            .root
+            .as_os_str()
+            .to_str()
+            .expect("cant covert path to str");
+
+        match &self.templates {
+            Some(templates) => {
+                Some(ProjectTemplateIterator::new(root, &self.name, &templates))
+            }
+            None => return None,
+        }
     }
 }
 
@@ -148,6 +163,62 @@ impl<'a> Iterator for ProjectPathIterator<'a> {
     }
 }
 
+pub struct ProjectTemplateIterator<'a> {
+    root_buf: PathBuf,
+    root: &'a str,
+    name: &'a str,
+    array: &'a [FileTemplate],
+    max_len: usize,
+    curr: usize,
+}
+
+impl<'a> ProjectTemplateIterator<'a> {
+    pub fn new(
+        root: &'a str,
+        name: &'a str,
+        array: &'a [FileTemplate],
+    ) -> Self {
+        Self {
+            root,
+            root_buf: PathBuf::from(root),
+            name,
+            curr: 0,
+            max_len: array.len(),
+            array,
+        }
+    }
+
+    fn template(&self, to_temp: &str) -> String {
+        template(self.root, self.name, to_temp)
+    }
+}
+
+impl<'a> Iterator for ProjectTemplateIterator<'a> {
+    type Item = (PathBuf, String);
+
+    // there should be very little trouble here, maybe do some checks as we take
+    // in data from ProjectConfig
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.curr >= self.max_len {
+            return None;
+        }
+
+        let next_to_template = &self.array[self.curr];
+
+        self.curr += 1;
+
+        let template_string = self.template(&next_to_template.template);
+
+        let path_name = &next_to_template.name;
+
+        let mut path_buf = self.root_buf.clone();
+
+        path_buf.push(path_name);
+
+        Some((path_buf, template_string))
+    }
+}
+
 // return a config from a toml file
 pub fn collect_config(path: &Path) -> Result<ProjectConfig, Box<dyn Error>> {
     use std::io::Read;
@@ -167,6 +238,10 @@ pub fn collect_config(path: &Path) -> Result<ProjectConfig, Box<dyn Error>> {
         }
     };
 
+    if config.name.as_ref().unwrap() == "{{name}}" {
+        panic!("fuck");
+    }
+
     Ok(config)
 }
 
@@ -174,35 +249,9 @@ pub fn collect_config(path: &Path) -> Result<ProjectConfig, Box<dyn Error>> {
 mod test {
     use super::*;
 
-    use crate::test_utils::{make_fake_project, TempSetup, make_fake_config};
-
-    pub fn make_fake_toml() -> String {
-        r#"
-        name = "test_project"
-
-        dirs = [
-            "src",
-            "tests",
-            "tests/fuck"
-        ]
-        files = [
-            "src/main.rs",
-            "tests/test_main.rs"
-        ]
-
-        [[templates]]
-        name = "src/main.ss"
-        template = """fn main() {
-            println!("hello world");
-        }
-        """
-
-        [[templates]]
-        name ="tests/test_main.rs"
-        template = "// no tests yet"
-        "#
-        .to_string()
-    }
+    use crate::test_utils::{
+        make_fake_toml, make_fake_project, TempSetup, make_fake_config,
+    };
 
     fn make_fake_conifg_file(root: &Path) -> bool {
         use std::io::Write;
@@ -232,7 +281,6 @@ mod test {
         match collect_config(&fake_path) {
             Err(err) => assert!(false, "{} bad toml config", err),
             Ok(config) => {
-                println!("{:#?}", config);
                 assert_eq!(config.name, Some(String::from("test_project")));
                 assert!(config.dirs.is_empty() == false, "config dirs empty");
 
@@ -323,5 +371,50 @@ mod test {
         );
 
         assert!(true);
+    }
+
+    #[test]
+    fn test_config_template_iter() {
+        let toml_config_string = make_fake_toml();
+
+        let toml_config = toml::from_str::<ProjectConfig>(&toml_config_string)
+            .expect("cant use fake toml file");
+
+        let root = Some(String::from("/tmp/test_root"));
+        let name = Some(String::from("test_project"));
+
+        let proj = Project::new(root, name, toml_config);
+
+        let mut template_iter =
+            proj.template_iter().expect("cant get template iter");
+
+        // tmp/temp_root/test_project
+        let first_test = (
+            PathBuf::from("/tmp/test_root/test_project/src/main.rs"),
+            r#"fn main() {
+    println!("hello test_project");
+}
+"#
+            .to_string(),
+        );
+
+        let first = template_iter
+            .next()
+            .expect("failed to call next on template_iter");
+
+        assert_eq!(first.0, first_test.0, "first path is not the same");
+        assert_eq!(first.1, first_test.1, "first string is not the same");
+
+        let second_test = (
+            PathBuf::from("/tmp/test_root/test_project/tests/test_main.rs"),
+            String::from("// no tests yet for test_project"),
+        );
+
+        let second = template_iter
+            .next()
+            .expect("failed to call next on template_iter");
+
+        assert_eq!(second.0, second_test.0, "second path is not the same");
+        assert_eq!(second.1, second_test.1, "second string is not the same");
     }
 }

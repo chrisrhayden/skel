@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use tempfile::{tempdir, TempDir};
 
-use crate::project::{Project, ProjectConfig, Template};
+use crate::project::{Project, ProjectConfig, FileTemplate};
 
 #[derive(Default)]
 pub struct TempSetup {
@@ -53,7 +53,7 @@ pub fn make_fake_config() -> ProjectConfig {
 fi"#,
     ));
 
-    let template_one = Template {
+    let template_one = FileTemplate {
         name: String::from("src/main.rs"),
         template: r#"fn main() {
     println!("hello world");
@@ -62,7 +62,7 @@ fi"#,
         .to_string(),
     };
 
-    let template_two = Template {
+    let template_two = FileTemplate {
         name: String::from("tests/test_main.rs"),
         template: String::from("no tests yet"),
     };
@@ -72,7 +72,7 @@ fi"#,
         dirs,
         files,
         build,
-        templates: vec![template_one, template_two],
+        templates: Some(vec![template_one, template_two]),
     }
 }
 
@@ -90,4 +90,31 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
     let name = Some(String::from("test_project"));
 
     Project::new(Some(root), name, conf)
+}
+
+pub fn make_fake_toml() -> String {
+    r#"name = "test_project"
+
+dirs = [
+    "src",
+    "tests",
+    "tests/fuck"
+]
+files = [
+    "src/main.rs",
+    "tests/test_main.rs"
+]
+
+[[templates]]
+name = "src/main.rs"
+template = """fn main() {
+    println!("hello {{name}}");
+}
+"""
+
+[[templates]]
+name ="tests/test_main.rs"
+template = "// no tests yet for {{name}}"
+"#
+    .to_string()
 }
