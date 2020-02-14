@@ -1,9 +1,12 @@
 # all file's/directory's will be made to the root level
-# like /current/path/test_js_project/src
+# with name test_js_project
+# dir "src/foo" will turn in to /current/path/test_js_project/src/foo
+
+# TODO: find out if the top level variables need to be first
 
 # the root path, basically the project name for configs as this will be taken ove
 # on the cli if given
-root = "test_js_project"
+name = "test_js_project"
 
 # make all directory's listed, wont skip even if just made by the programme so
 # you could skip src if you make src/foo
@@ -20,17 +23,38 @@ files = [
     "tests/test_main.js",
 ]
 
-[template]
-{name = "src/main.js", template = """function main() {
-    console.log("hello world");
-}
-
-main();
-"""}
 
 # a build script that will be run by bash,
 # `#!/usr/bin/env bash` will be added, just for now probably a bad idea
 build = """
 echo "would run -- yarn init -y -cwd {{root}}"
 echo "would run -- yarn add -cwd {{root}} 'eslint'"
+"""
+
+[[templates]]
+name = "src/main.js"
+template = """function run() {
+    return  true;
+}
+
+function main() {
+    console.log("hello world");
+}
+
+main();
+
+module.run = run;
+"""
+
+[[templates]]
+name = "tests/test_main.js"
+template= """const { run } = require('./main');
+
+function test_main() {
+    if (!run()) {
+        console.log("its fucked");
+    }
+}
+
+test_main();
 """

@@ -95,6 +95,7 @@ impl Project {
 
         ProjectPathIterator::new(root, &self.name, &self.files)
     }
+
     pub fn template_iter(&self) -> Option<ProjectTemplateIterator> {
         let root = self
             .root
@@ -106,7 +107,7 @@ impl Project {
             Some(templates) => {
                 Some(ProjectTemplateIterator::new(root, &self.name, &templates))
             }
-            None => return None,
+            None => None,
         }
     }
 }
@@ -238,7 +239,11 @@ pub fn collect_config(path: &Path) -> Result<ProjectConfig, Box<dyn Error>> {
         }
     };
 
-    if config.name.as_ref().unwrap() == "{{name}}" {
+    if config.build.is_none() {
+        panic!("fuck");
+    }
+
+    if config.name.as_ref().expect("cant get config name") == "{{name}}" {
         panic!("fuck");
     }
 

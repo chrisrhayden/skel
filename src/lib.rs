@@ -18,5 +18,9 @@ pub fn make_project(project: &Project) -> Result<(), Box<dyn Error>> {
         return Err(Box::from(err.to_string()));
     };
 
-    call_build_script(project)
+    if project.build.is_some() {
+        call_build_script(project)
+    } else {
+        Ok(())
+    }
 }

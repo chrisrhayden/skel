@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fs;
+use std::path::PathBuf;
 
 use crate::new_rs_error::{NewRsErrorType, NewRsError};
 use crate::project::Project;
@@ -20,8 +21,22 @@ fn make_project_files(project: &Project) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn make_template(template: (PathBuf, String)) -> Result<(), Box<dyn Error>> {
+    use std::io::Write;
+
+    let mut template_file = fs::File::create(template.0)?;
+
+    template_file.write_all(template.1.as_bytes())?;
+
+    Ok(())
+}
+
 fn make_project_templates(project: &Project) -> Result<(), Box<dyn Error>> {
-    unimplemented!();
+    for template in project.template_iter().expect("no templates given") {
+        make_template(template)?;
+    }
+
+    Ok(())
 }
 
 fn io_err_to_new_error(io_err: Box<dyn Error>) -> Result<(), NewRsError> {
