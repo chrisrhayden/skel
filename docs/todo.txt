@@ -8,6 +8,9 @@ short term:
     * Project struct from directory
     * or just copy directory
 
-
 long term:
 - better templating
+    * use a templating library
+
+notes:
+- i dont like that Project::new is where defaults are set

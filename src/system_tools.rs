@@ -6,11 +6,15 @@ use crate::{project::Project, template::template};
 
 fn make_bash_string(project: &Project) -> String {
     // if unwind fails here we have other issues
-    let mut bash_string = project.build.as_ref().unwrap().to_string();
+    let mut bash_string = project
+        .build
+        .as_ref()
+        .expect("cant get build script")
+        .to_string();
 
     bash_string.insert_str(0, "#!/usr/bin/env bash\n\n");
 
-    let root = project.root.as_os_str().to_str().unwrap();
+    let root = project.root.to_str().expect("cant get root str");
 
     let name = &project.name;
 
@@ -66,6 +70,8 @@ mod test {
 
     use crate::test_utils::make_fake_project;
 
+    // TODO: test if the cmd was made correctly or if ran correctly, but idk how
+
     #[test]
     fn test_make_bash_string() {
         let fake_root = Some(PathBuf::from("/tmp/test_root"));
@@ -75,11 +81,11 @@ mod test {
         let hand_made = String::from(
             r#"#!/usr/bin/env bash
 
-if [[ -f test_project ]]; then
-    echo "test_project exists"
+if [[ -d test_project ]]; then
+    echo "running in $PWD"
 fi"#,
         );
 
-        assert!(new_string == hand_made, "didn't make string correctly");
+        assert_eq!(new_string, hand_made, "didn't make string correctly");
     }
 }

@@ -1,26 +1,96 @@
 #![allow(dead_code)]
-use std::path::PathBuf;
+use std::{error::Error, path::PathBuf, fs};
 
 use tempfile::{tempdir, TempDir};
 
-use crate::project::{Project, ProjectConfig, FileTemplate};
+use toml;
+
+use crate::project::{Project, ProjectConfig};
 
 #[derive(Default)]
 pub struct TempSetup {
-    path: PathBuf,
+    root: PathBuf,
     temp: Option<TempDir>,
+    project: Option<Project>,
 }
 
 impl TempSetup {
     pub fn setup(&mut self) -> PathBuf {
         self.temp = Some(tempdir().unwrap());
-        self.path = self.temp.as_ref().unwrap().path().to_owned();
+        self.root = self.temp.as_ref().unwrap().path().to_owned();
 
-        self.path.clone()
+        self.project = Some(make_fake_project(Some(self.root.clone())));
+
+        self.root.clone()
     }
 
-    pub fn pathbuf(&self) -> PathBuf {
-        self.path.clone()
+    pub fn root_buf(&self) -> PathBuf {
+        self.root.clone()
+    }
+
+    pub fn make_fake_project_dirs(
+        &self,
+        proj: Option<&Project>,
+    ) -> Result<(), Box<dyn Error>> {
+        if !self.root.exists() {
+            panic!("must be run after setup");
+        }
+
+        let project = if let Some(proj) = proj {
+            proj
+        } else {
+            self.project.as_ref().unwrap()
+        };
+
+        for dir in project.dir_iter() {
+            fs::create_dir_all(dir)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn make_fake_project_files(
+        &self,
+        proj: Option<&Project>,
+    ) -> Result<(), Box<dyn Error>> {
+        if !self.root.exists() {
+            panic!("must be run after setup");
+        }
+
+        let project = if let Some(proj) = proj {
+            proj
+        } else {
+            self.project.as_ref().unwrap()
+        };
+
+        for file in project.file_iter() {
+            fs::File::create(file)?;
+        }
+
+        Ok(())
+    }
+
+    // im not sure what would be a better way
+    pub fn make_fake_project_tree(&self) -> Result<(), Box<dyn Error>> {
+        if !self.root.exists() {
+            panic!("must be run after setup");
+        }
+
+        let project = self.project.as_ref();
+
+        if let Err(err) = self.make_fake_project_dirs(project) {
+            eprintln!("{}", err);
+            panic!("can t make dirs {}", err);
+        }
+
+        if let Err(err) = self.make_fake_project_files(project) {
+            eprintln!("{}", err);
+            panic!("can t make files {}", err);
+        }
+
+        // TODO: add templating
+
+        Ok(())
     }
 }
 
@@ -33,47 +103,10 @@ impl Drop for TempSetup {
 }
 
 pub fn make_fake_config() -> ProjectConfig {
-    let name = Some(String::from("test_project"));
+    let fake_toml = make_fake_toml();
 
-    let dirs: Vec<String> = vec![
-        String::from("src"),
-        String::from("tests"),
-        String::from("tests/more_tests"),
-    ];
-
-    let files: Vec<String> = vec![
-        String::from("src/main.rs"),
-        String::from("tests/test_main.rs"),
-    ];
-
-    // let build: Option<String> = Some("echo 'test shell'".to_string());
-    let build = Some(String::from(
-        r#"if [[ -f test_project ]]; then
-    echo "test_project exists"
-fi"#,
-    ));
-
-    let template_one = FileTemplate {
-        name: String::from("src/main.rs"),
-        template: r#"fn main() {
-    println!("hello world");
-}
-"#
-        .to_string(),
-    };
-
-    let template_two = FileTemplate {
-        name: String::from("tests/test_main.rs"),
-        template: String::from("no tests yet"),
-    };
-
-    ProjectConfig {
-        name,
-        dirs,
-        files,
-        build,
-        templates: Some(vec![template_one, template_two]),
-    }
+    toml::from_str::<ProjectConfig>(&fake_toml)
+        .expect("cant make config from fake toml")
 }
 
 pub fn make_fake_project(root: Option<PathBuf>) -> Project {
@@ -98,12 +131,17 @@ pub fn make_fake_toml() -> String {
 dirs = [
     "src",
     "tests",
-    "tests/fuck"
+    "tests/more_tests"
 ]
 files = [
     "src/main.rs",
     "tests/test_main.rs"
 ]
+
+build = """
+if [[ -d test_project ]]; then
+    echo "running in $PWD"
+fi"""
 
 [[templates]]
 name = "src/main.rs"

@@ -76,6 +76,10 @@ impl Project {
         }
     }
 
+    pub fn root_string(&self) -> String {
+        self.root.to_str().expect("cant get root string").to_owned()
+    }
+
     pub fn dir_iter(&self) -> ProjectPathIterator {
         let root = self
             .root
@@ -278,11 +282,16 @@ mod test {
         match collect_config(&fake_path) {
             Err(err) => assert!(false, "{} bad toml config", err),
             Ok(config) => {
-                assert_eq!(config.name, Some(String::from("test_project")));
-                assert!(config.dirs.is_empty() == false, "config dirs empty");
+                assert_eq!(
+                    config.name,
+                    Some(String::from("test_project")),
+                    "did not get the right name"
+                );
+
+                assert_eq!(config.dirs.is_empty(), false, "config dirs empty");
 
                 for entry in config.dirs {
-                    assert!(entry.is_empty() == false, "no dirs in array");
+                    assert_eq!(entry.is_empty(), false, "no dirs in array");
                 }
             }
         };
