@@ -1,5 +1,4 @@
 use std::{
-    env,
     error::Error,
     fs,
     path::{Path, PathBuf},
@@ -13,11 +12,27 @@ use crate::template::template;
 // a config to deserialize project files in toml
 #[derive(Debug, Deserialize)]
 pub struct ProjectConfig {
-    pub name: Option<String>,
     pub dirs: Vec<String>,
     pub files: Vec<String>,
     pub build: Option<String>,
     pub templates: Option<Vec<FileTemplate>>,
+}
+
+// just impl new for ease of use
+impl ProjectConfig {
+    pub fn new(
+        dirs: Vec<String>,
+        files: Vec<String>,
+        build: Option<String>,
+        templates: Option<Vec<FileTemplate>>,
+    ) -> Self {
+        Self {
+            dirs,
+            files,
+            build,
+            templates,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -26,7 +41,7 @@ pub struct FileTemplate {
     pub template: String,
 }
 
-// a project struct to eventually use to make the project last should take precedent: default > file config > cli config (this takes precedent)
+// a project struct to eventually use to make the project
 #[derive(Debug)]
 pub struct Project {
     // the root, current_dir/given on cli plus name
@@ -43,33 +58,11 @@ pub struct Project {
 }
 
 impl Project {
-    pub fn new(
-        cli_root: Option<String>,
-        cli_name: Option<String>,
-        config: ProjectConfig,
-    ) -> Self {
-        // this is kind of weird
-        let mut root = if let Some(cli_root) = cli_root {
-            PathBuf::from(cli_root)
-        } else {
-            env::current_dir().expect("cant get current dir")
-        };
-
-        // set the cli if any
-        let name = if let Some(name) = cli_name {
-            name
-        } else if let Some(name) = config.name {
-            name
-        } else {
-            panic!("no name for project, wtf");
-        };
-
-        // set root to the project name not the current_dir
-        // or the one given on the cli
-        root.push(&name);
-
+    // the root and name should be resolve before here
+    // the config should just be the things to make not where
+    pub fn new(root: String, name: String, config: ProjectConfig) -> Self {
         Self {
-            root,
+            root: PathBuf::from(root),
             name,
             dirs: config.dirs,
             files: config.files,
@@ -285,8 +278,8 @@ mod test {
             Err(err) => assert!(false, "{} bad toml config", err),
             Ok(config) => {
                 assert_eq!(
-                    config.name,
-                    Some(String::from("test_project")),
+                    config.dirs[0],
+                    String::from("src"),
                     "did not get the right name"
                 );
 
@@ -303,9 +296,9 @@ mod test {
     fn test_new_project() {
         let config = make_fake_config();
 
-        let root = Some(String::from("/tmp/test_path"));
+        let root = String::from("/tmp/test_path");
 
-        let name = Some(String::from("test_project"));
+        let name = String::from("test_project");
 
         let project = Project::new(root, name, config);
 
@@ -388,8 +381,11 @@ mod test {
         let toml_config = toml::from_str::<ProjectConfig>(&toml_config_string)
             .expect("cant use fake toml file");
 
-        let root = Some(String::from("/tmp/test_root"));
-        let name = Some(String::from("test_project"));
+        let mut root = String::from("/tmp/test_root");
+        let name = String::from("test_project");
+
+        root.push('/');
+        root.push_str(&name);
 
         let proj = Project::new(root, name, toml_config);
 
