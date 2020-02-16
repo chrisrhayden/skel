@@ -1,12 +1,12 @@
-use std::error::Error;
-use std::fs;
-use std::path::PathBuf;
+use std::{error::Error, fs, path::PathBuf};
 
-use crate::new_rs_error::{NewRsErrorType, NewRsError};
-use crate::project::Project;
+use crate::{
+    new_rs_error::{NewRsError, NewRsErrorType},
+    project::Project,
+};
 
-// the only function to do fs system checks is the make_project_tree,
-// im not sure if that should change
+// NOTE: the only function to do fs system checks is the make_project_tree,
+//       im not sure if that should change
 
 fn make_project_dirs(project: &Project) -> Result<(), Box<dyn Error>> {
     for dir in project.dir_iter() {
@@ -24,7 +24,7 @@ fn make_project_files(project: &Project) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn make_template(template: (PathBuf, String)) -> Result<(), Box<dyn Error>> {
+fn write_template(template: (PathBuf, String)) -> Result<(), Box<dyn Error>> {
     use std::io::Write;
 
     let mut template_file = fs::File::create(template.0)?;
@@ -36,29 +36,30 @@ fn make_template(template: (PathBuf, String)) -> Result<(), Box<dyn Error>> {
 
 fn make_project_templates(project: &Project) -> Result<(), Box<dyn Error>> {
     for template in project.template_iter().expect("no templates given") {
-        make_template(template)?;
+        write_template(template)?;
     }
 
     Ok(())
 }
 
-fn io_err_to_new_error(io_err: Box<dyn Error>) -> Result<(), NewRsError> {
+fn io_err_to_new_error(io_err: Box<dyn Error>) -> NewRsError {
     let err_string = format!("{:?}", io_err);
 
     let err_type = NewRsErrorType::IoError;
 
-    Err(NewRsError::new(err_type, err_string))
+    NewRsError::new(err_type, err_string)
 }
 
 // the interface for making the project tree
 // this will make
-//     - directory's,
-//     - blank files
+//     - directory's, (mkdir path/to/dir)
+//     - blank files (touch path/to/file)
 //     - file templates
 // these functions works like unix's mkdir or touch
 // if the std lib changes make sure to adjust
 // templates are another story
 pub fn make_project_tree(project: &Project) -> Result<(), NewRsError> {
+    // check if something exists at root, root being /path/to/project_name
     if project.root.exists() {
         let root_string = project.root_string();
 
@@ -67,19 +68,16 @@ pub fn make_project_tree(project: &Project) -> Result<(), NewRsError> {
         return Err(NewRsError::new(err_type, root_string));
     }
 
-    if let Err(err) = make_project_dirs(project) {
-        io_err_to_new_error(err)?;
-    }
+    // TODO: run the fs functions in order converting any err to IoNewErr, this
+    // is to patter match on but should be changed to something more idiomatic
 
-    if let Err(err) = make_project_files(project) {
-        io_err_to_new_error(err)?;
-    }
+    make_project_dirs(project).map_err(io_err_to_new_error)?;
 
-    if let Err(err) = make_project_templates(project) {
-        io_err_to_new_error(err)
-    } else {
-        Ok(())
-    }
+    make_project_files(project).map_err(io_err_to_new_error)?;
+
+    make_project_templates(project).map_err(io_err_to_new_error)?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -88,7 +86,7 @@ mod test {
 
     use std::path::PathBuf;
 
-    use crate::test_utils::{TempSetup, make_fake_project};
+    use crate::test_utils::{make_fake_project, TempSetup};
 
     #[test]
     fn test_make_project_dirs() {
@@ -199,6 +197,17 @@ mod test {
     }
 
     #[test]
+    fn test_make_project_templates_failes() {
+        let proj = make_fake_project(None);
+
+        if let Err(_) = make_project_templates(&proj) {
+            assert!(true);
+        } else {
+            assert!(false, "files where made");
+        }
+    }
+
+    #[test]
     fn test_make_project_templates() {
         use std::io::Read;
 
@@ -235,7 +244,6 @@ mod test {
     println!("hello test_project");
 }
 "#;
-
         assert_eq!(
             buf, test_main_file_string,
             "main_file template did not work"

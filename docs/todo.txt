@@ -3,6 +3,7 @@ test:
 - test failures of structs
 
 short term:
+- check if paths are relative or absolute
 - cli args
 - make from a directory
     * Project struct from directory

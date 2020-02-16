@@ -1,4 +1,3 @@
-// TODO check if relative or absolute
 // this is terrible
 pub fn template(root: &str, name: &str, old_string: &str) -> String {
     let new_string: String = if old_string.contains("{{root}}") {

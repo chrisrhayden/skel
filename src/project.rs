@@ -1,10 +1,12 @@
-use std::error::Error;
-use std::fs;
-use std::path::{PathBuf, Path};
-use std::env;
+use std::{
+    env,
+    error::Error,
+    fs,
+    path::{Path, PathBuf},
+};
 
-use toml;
 use serde::Deserialize;
+use toml;
 
 use crate::template::template;
 
@@ -251,7 +253,7 @@ mod test {
     use super::*;
 
     use crate::test_utils::{
-        make_fake_toml, make_fake_project, TempSetup, make_fake_config,
+        make_fake_config, make_fake_project, make_fake_toml, TempSetup,
     };
 
     fn make_fake_conifg_file(root: &Path) -> bool {

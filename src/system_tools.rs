@@ -1,6 +1,4 @@
-use std::error::Error;
-use std::path::PathBuf;
-use std::process::Command;
+use std::{error::Error, path::PathBuf, process::Command};
 
 use crate::{project::Project, template::template};
 
