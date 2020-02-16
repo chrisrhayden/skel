@@ -7,6 +7,8 @@ url="https://github.com/chrisrhayden/${pkgname}"
 makedepends=("cargo")
 source=("https://github.com/chrisrhayden/${pkgname}.git")
 sha256sums=("SKIP")
+pkgrel=1
+pkgvel="0.1.0"
 
 build() {
   cd "${srcdir}/${pkgname}"
