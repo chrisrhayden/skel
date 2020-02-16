@@ -1,0 +1,22 @@
+# copied from the just PKGBUILD
+# https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=just
+
+pkgname=new
+arch=("x86_64")
+url="https://github.com/chrisrhayden/${pkgname}"
+makedepends=("cargo")
+source=("https://github.com/chrisrhayden/${pkgname}.git")
+sha256sums=("SKIP")
+
+build() {
+  cd "${srcdir}/${pkgname}"
+  cargo build --release
+}
+
+package() {
+  cd "${srcdir}/${pkgname}"
+  install -Dm755 \
+      "${srcdir}/${pkgname}/target/release/${pkgname}" \
+      "${pkgdir}/usr/bin/${pkgname}"
+}
+
