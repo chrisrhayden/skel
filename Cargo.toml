@@ -10,3 +10,4 @@ edition = "2018"
 tempfile = "3"
 toml = "0.5"
 serde = { version = "1", features = ["derive"] }
+clap = { git = "https://github.com/clap-rs/clap/" }

@@ -1,8 +1,9 @@
 test:
 - make test for optional config variables
-- test failures of structs
+- test for failures
 
 short term:
+- cli interface
 - check if paths are relative or absolute
 - cli args
 - make from a directory
