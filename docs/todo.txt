@@ -3,7 +3,7 @@ test:
 - test for failures
 
 short term:
-- cli interface
+- make cli interface batter
 - check if paths are relative or absolute
 - cli args
 - make from a directory
