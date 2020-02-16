@@ -110,7 +110,7 @@ pub fn make_fake_config() -> ProjectConfig {
 }
 
 pub fn make_fake_project(root: Option<PathBuf>) -> Project {
-    let root: String = if let Some(root) = root {
+    let mut root: String = if let Some(root) = root {
         String::from(
             root.as_os_str().to_str().expect("cant get temp path a str"),
         )
@@ -120,15 +120,16 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
 
     let conf = make_fake_config();
 
-    let name = Some(String::from("test_project"));
+    let name = String::from("test_project");
 
-    Project::new(Some(root), name, conf)
+    root.push('/');
+    root.push_str(&name);
+
+    Project::new(root, name, conf)
 }
 
 pub fn make_fake_toml() -> String {
-    r#"name = "test_project"
-
-dirs = [
+    r#"dirs = [
     "src",
     "tests",
     "tests/more_tests"
