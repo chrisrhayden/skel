@@ -220,7 +220,9 @@ impl<'a> Iterator for ProjectTemplateIterator<'a> {
 }
 
 // return a config from a toml file
-pub fn collect_config(path: &Path) -> Result<ProjectConfig, Box<dyn Error>> {
+pub fn collect_project_config(
+    path: &Path,
+) -> Result<ProjectConfig, Box<dyn Error>> {
     use std::io::Read;
 
     let mut dir_config = fs::File::open(path)?;
@@ -274,7 +276,7 @@ mod test {
             assert!(false, "failed to make fake config in temp dir");
         }
 
-        match collect_config(&fake_path) {
+        match collect_project_config(&fake_path) {
             Err(err) => assert!(false, "{} bad toml config", err),
             Ok(config) => {
                 assert_eq!(
