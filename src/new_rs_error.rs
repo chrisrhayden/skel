@@ -39,6 +39,10 @@ impl NewRsError {
 
 impl fmt::Display for NewRsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "type: {} message: {}", self.err_type, self.err_str)
+        write!(
+            f,
+            "Error -- type: {} message: {}",
+            self.err_type, self.err_str
+        )
     }
 }
