@@ -1,0 +1,74 @@
+# all file's/directory's will be made to the root level
+#   `src/foo` will turn in to /current/path/test_js_project/src/foo
+
+# all strings will be run through a template
+# the slugs so far are:
+#     - {{root}} = the root project directory (e.g. /tmp/example_project)
+#     - {{name}} = the new project name (e.g. cool_cli_tool)
+#
+# example:
+#   src = "{{root}}/src" = "/tmp/example_project/src"
+#   main = "{{root}}/src/main.js" = "/tmp/example_project/src/main.rs"
+
+# make all directory's listed
+# this wont fail on already made dirs,
+# so having the same dirs is fine (e.g. dirs = ["src", "src"])
+# each dir will correspond to the linux cmd `mkdir -p path/to/dir`
+# so you could skip `src` if you make `src/foo` (e.g. dirs = ["src/foo"])
+dirs = [
+    "src",
+    "src/foo"
+]
+
+# this corresponds to the linux cmd `touch path/to/file`
+# so if you have `src/foo/main.js` you need `src/foo` in the dirs list
+files = [
+    "src/main.js",
+    "src/foo/{{name}}.txt"
+    ".eslint.json",
+]
+
+
+# a build script that will be run by bash,
+# `#!/usr/bin/env bash` will be added, just for now probably a bad idea
+build = """
+echo "yarn init -y -cwd '{{root}}'"
+
+if [[ -f {{root}}/package.json ]]; then
+    echo "yarn add -cwd '{{root}}' 'eslint'"
+fi
+"""
+
+# basic templates to be made, the same slugs apply
+# these should fail if not in the file list
+[[templates]]
+name = "src/main.js"
+template = """function run() {
+    console.log("hello {{name}}");
+    return true;
+}
+
+function main() {
+    run();
+}
+
+main();
+
+module.run = run;
+"""
+
+[[templates]]
+name  = ".eslint.json"
+template = """{
+    "parserOptions": {
+        "ecmaVersion": 6,
+        "sourceType": "module",
+        "ecmaFeatures": {
+            "jsx": true
+        }
+    },
+    "rules": {
+        "semi": "error"
+    }
+}
+"""

@@ -1,6 +1,9 @@
+# TODO: find out if the top level variables need to be first
+
 test:
 - make test for optional config variables
 - test for failures
+    * there are templates that aren't in the file list
 
 short term:
 - make cli interface batter
@@ -11,6 +14,8 @@ short term:
     * or just copy directory
 
 long term:
+- make config use a single project dir and look up the given name or alias from
+  the file system
 - better templating
     * use a templating library
 
