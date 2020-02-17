@@ -1,4 +1,5 @@
 // this is so we can use Project
+pub mod cli;
 mod fs_tools;
 mod new_rs_error;
 mod project;
