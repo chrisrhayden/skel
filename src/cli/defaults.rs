@@ -3,11 +3,10 @@ use std::{collections::HashMap, env, fs, path::PathBuf};
 
 use serde::Deserialize;
 
-use crate::Project;
+use crate::{Project, collect_project_config};
 
 use super::my_utils::get_home_dir;
-use super::NewArgs;
-use super::NewResult;
+use super::{NewArgs, NewResult, project_path_with_templateing };
 
 pub type UserResult = NewResult<UserConfig>;
 
@@ -132,3 +131,41 @@ pub fn resolve_default(
 
     Ok(Project::new(root_string, name, project_config))
 }
+
+pub fn find_project_file(
+    user_config: &UserConfig,
+    type_str: &str,
+) -> NewResult<String> {
+    let type_string = type_str.to_string();
+
+    if let Some(path_string) = user_config.projects.get(&type_string) {
+        return Ok(path_string.clone());
+    }
+
+    let mut project_string = String::new();
+    for (project, alias) in user_config.alias.iter() {
+        // println!("--->>>>> {:?} {:?}", project, alias);
+        if alias.contains(&type_string) && project_string.is_empty() {
+            project_string.push_str(project);
+        }
+    }
+
+    if project_string.is_empty() {
+        return Err(Box::from(format!(
+            "given project type not in user config -- {}",
+            type_str
+        )));
+    }
+
+    match user_config.projects.get(&project_string) {
+        Some(val) => Ok(val.to_string()),
+        None => {
+            // this seams unlikely
+            Err(Box::from(format!(
+                "no project for that ailas -- {}",
+                type_string
+            )))
+        }
+    }
+}
+

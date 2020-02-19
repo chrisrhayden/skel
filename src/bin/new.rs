@@ -1,4 +1,6 @@
-use new_rs::cli::parse_args;
+use new_rs::cli::parse_args::parse_args;
+use new_rs::cli::defaults::{config_str_to_user_struct, resolve_default};
+use new_rs::make_project;
 
 fn main() {
     let args = match parse_args() {
