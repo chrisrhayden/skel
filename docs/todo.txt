@@ -1,6 +1,7 @@
 # TODO: find out if the top level variables need to be first
 
 test:
+- add a way to not run build script or templates
 - make test for optional config variables
 - test for failures
     * there are templates that aren't in the file list
@@ -9,6 +10,7 @@ short term:
 - make cli interface batter
 - check if paths are relative or absolute
 - cli args
+- add include file to config
 - make from a directory
     * Project struct from directory
     * or just copy directory
