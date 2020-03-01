@@ -1,12 +1,11 @@
+// NOTE: the only function to do fs system checks is the make_project_tree,
+// im not sure if that should change
 use std::{error::Error, fs, path::PathBuf};
 
 use crate::{
     new_rs_error::{NewRsError, NewRsErrorType},
     project::Project,
 };
-
-// NOTE: the only function to do fs system checks is the make_project_tree,
-//       im not sure if that should change
 
 fn make_project_dirs(project: &Project) -> Result<(), Box<dyn Error>> {
     for dir in project.dir_iter() {

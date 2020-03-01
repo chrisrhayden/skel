@@ -1,3 +1,4 @@
+//! the cli interface for new
 pub mod defaults;
 pub mod my_utils;
 pub mod parse_args;
@@ -20,16 +21,15 @@ fn project_path_with_templateing(
     config_dir: &Option<String>,
 ) -> NewResult<PathBuf> {
     let project_pathbuf = if let Some(proj_str) = args.type_str.as_ref() {
-            let p_string =
-                find_project_file(user_config, &proj_str)?;
+        let p_string = find_project_file(user_config, &proj_str)?;
 
-            let p_string = if let Some(c_dir) = config_dir {
-                template_user_config(c_dir, &p_string)
-            } else {
-                panic!("did not get project_dir string");
-            };
+        let p_string = if let Some(c_dir) = config_dir {
+            template_user_config(c_dir, &p_string)
+        } else {
+            panic!("did not get project_dir string");
+        };
 
-            PathBuf::from(p_string)
+        PathBuf::from(p_string)
     } else {
         // we should not reach this
         panic!("did not receive the project type or file");
