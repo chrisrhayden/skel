@@ -13,8 +13,8 @@ pub struct NewArgs {
 }
 
 fn get_arg_matches() -> ArgMatches {
-    App::new("new, a project maker")
-        .about("makes projects from ether a file or directory structure")
+    App::new("new -- a project maker")
+        .about("makes projects from a toml file")
         .version("0")
         .arg(
             Arg::with_name("TYPE")
@@ -60,14 +60,6 @@ pub fn parse_args() -> Result<NewArgs, Box<dyn Error>> {
     let project_file = matches.value_of("project file");
     let root = matches.value_of("different root");
     let config_path = matches.value_of("different config");
-
-    // use std::env;
-    // println!("{:?}", env::args());
-    // println!("name {:?}", name);
-    // println!("root {:?}", root);
-    // println!("project_type {:?}", project_type);
-    // println!("project_file {:?}", project_file);
-    // println!("config_path {:?}", config_path);
 
     if project_type.is_some() && project_file.is_some() && name.is_some() {
         return Err(Box::from(String::from("to many args given")));
