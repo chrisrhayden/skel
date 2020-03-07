@@ -11,15 +11,15 @@ short term:
 - check if paths are relative or absolute
 - cli args
 - add include file to config
-- make from a directory
-    * Project struct from directory
-    * or just copy directory
-
 long term:
 - make config use a single project dir and look up the given name or alias from
   the file system
 - better templating
     * use a templating library
+- make from a directory
+    * Project struct from directory
+    * or just copy directory
+
 
 notes:
 - i dont like that Project::new is where defaults are set
