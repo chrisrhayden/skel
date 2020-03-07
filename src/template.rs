@@ -5,6 +5,6 @@ pub fn template(root: &str, name: &str, old_string: &str) -> String {
     new_string.replace("{{name}}", name)
 }
 
-pub fn template_str(user_str: &str, old_string: &str) -> String {
-    old_string.replace("{{config-new}}", user_str)
+pub fn template_str(replace_with: &str, old_string: &str) -> String {
+    old_string.replace("{{config-dir}}", replace_with)
 }

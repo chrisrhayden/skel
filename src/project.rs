@@ -452,7 +452,7 @@ mod test {
 
         let mut temp_iter = project.template_iter().unwrap();
 
-        let (include_path, include_str) = temp_iter.nth(2).unwrap();
+        let (_, include_str) = temp_iter.nth(2).unwrap();
 
         assert_eq!(
             include_str, "test include value\n",
