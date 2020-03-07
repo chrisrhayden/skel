@@ -1,9 +1,12 @@
 // NOTE: the only function to do fs system checks is the make_project_tree,
-// im not sure if that should change
+//       im not sure if that should change
+// NOTE: the std lib said they might change create_dir_all or File::create
+//       make sure to adjust if they do
+
 use std::{error::Error, fs, path::PathBuf};
 
 use crate::{
-    new_rs_error::{NewRsError, NewRsErrorType},
+    new_rs_error::{NewInnerErrType, NewInnerError},
     project::Project,
 };
 
@@ -34,49 +37,40 @@ fn write_template(template: (PathBuf, String)) -> Result<(), Box<dyn Error>> {
 }
 
 fn make_project_templates(project: &Project) -> Result<(), Box<dyn Error>> {
-    for template in project.template_iter().expect("no templates given") {
+    // it fine to not have templates
+    if project.templates.is_none() {
+        return Ok(());
+    }
+
+    for template in project.template_iter().unwrap() {
         write_template(template)?;
     }
 
     Ok(())
 }
 
-fn io_err_to_new_error(io_err: Box<dyn Error>) -> NewRsError {
-    let err_string = format!("{:?}", io_err);
-
-    let err_type = NewRsErrorType::IoError;
-
-    NewRsError::new(err_type, err_string)
-}
-
-// the interface for making the project tree
-// this will make
-//     - directory's, (mkdir path/to/dir)
-//     - blank files (touch path/to/file)
-//     - file templates
-// these functions works like unix's mkdir or touch
-// if the std lib changes make sure to adjust
-// templates are another story
-pub fn make_project_tree(project: &Project) -> Result<(), NewRsError> {
+///! the interface for making the project tree
+///! this will make
+///!     - directory's, (mkdir path/to/dir)
+///!     - blank files (touch path/to/file)
+///!     - file templates (echo "$template" > path/to/file)
+///! these functions works like unix's mkdir or touch
+///! templates are another story
+pub fn make_project_tree(project: &Project) -> Result<(), NewInnerError> {
     // check if something exists at root, root being /path/to/project_name
     if project.root.exists() {
         let root_string = project.root_string();
 
-        let err_type = NewRsErrorType::ProjectExists;
+        let err_type = NewInnerErrType::ProjectExists;
 
-        return Err(NewRsError::new(err_type, root_string));
+        return Err(NewInnerError::new(err_type, root_string));
     }
 
-    // TODO: run the fs functions in order converting any err to IoNewErr, this
-    // is to patter match on but should be changed to something more idiomatic
+    make_project_dirs(project).map_err(NewInnerError::from_io_err)?;
 
-    make_project_dirs(project).map_err(io_err_to_new_error)?;
+    make_project_files(project).map_err(NewInnerError::from_io_err)?;
 
-    make_project_files(project).map_err(io_err_to_new_error)?;
-
-    make_project_templates(project).map_err(io_err_to_new_error)?;
-
-    Ok(())
+    make_project_templates(project).map_err(NewInnerError::from_io_err)
 }
 
 #[cfg(test)]
@@ -182,8 +176,8 @@ mod test {
 
         if let Err(err) = make_project_tree(&proj) {
             match err.kind() {
-                NewRsErrorType::ProjectExists => assert!(true),
-                NewRsErrorType::IoError => {
+                NewInnerErrType::ProjectExists => assert!(true),
+                NewInnerErrType::IoError => {
                     eprintln!("{}", err);
                     assert!(false, "io err");
                 }
