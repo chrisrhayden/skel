@@ -7,10 +7,7 @@ use std::{
 use serde::Deserialize;
 use toml;
 
-use crate::{
-    fs_tools::collect_string_from_file,
-    template::{template, template_str},
-};
+use crate::{fs_tools::collect_string_from_file, template::template};
 
 // a config to deserialize project files in toml
 #[derive(Debug, Deserialize)]
@@ -66,20 +63,22 @@ impl Project {
 
         let mut errors: Vec<String> = Vec::new();
 
-        for template in self.templates.as_mut().unwrap() {
+        for template_struct in self.templates.as_mut().unwrap() {
             // the include variable is present force the template to whatever
             // is in the include path if it exists
-            if let Some(include_str) = template.include.as_ref() {
-                let include_path = PathBuf::from(template_str(
+            if let Some(include_str) = template_struct.include.as_ref() {
+                let include_path = PathBuf::from(template(
                     &self.config_dir_string,
+                    &self.name,
                     include_str,
                 ));
 
-                template.template =
+                template_struct.template =
                     Some(collect_string_from_file(include_path)?);
-            } else if template.include.is_none() && template.template.is_none()
+            } else if template_struct.include.is_none()
+                && template_struct.template.is_none()
             {
-                errors.push(template.path.to_owned());
+                errors.push(template_struct.path.to_owned());
             }
         }
 
