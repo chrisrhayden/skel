@@ -56,7 +56,7 @@ fn find_project_file(
 fn project_path_with_templateing(
     type_str: String,
     user_config: UserConfig,
-    config_dir: String,
+    config_dir: &str,
 ) -> NewResult<PathBuf> {
     let p_string = find_project_file(user_config, type_str)?;
 
@@ -145,17 +145,20 @@ pub fn collect_user_config(
 pub fn resolve_default(args: NewArgs) -> NewResult<Project> {
     let name = args.name;
 
-    let project_pathbuf = match args.cli_project_file {
-        Some(project_file) => PathBuf::from(project_file),
+    let (project_pathbuf, project_dir_str) = match args.cli_project_file {
+        Some(project_file) => (PathBuf::from(project_file), None),
         None => {
             let (user_config, config_dir_path) =
                 collect_user_config(args.cli_config_path)?;
 
-            project_path_with_templateing(
-                args.type_str,
-                user_config,
-                config_dir_path,
-            )?
+            (
+                project_path_with_templateing(
+                    args.type_str,
+                    user_config,
+                    &config_dir_path,
+                )?,
+                Some(config_dir_path),
+            )
         }
     };
 
@@ -167,7 +170,9 @@ pub fn resolve_default(args: NewArgs) -> NewResult<Project> {
         )));
     }
 
-    let project_config = collect_project_config(&project_pathbuf)?;
+    let mut project_config = collect_project_config(&project_pathbuf)?;
+
+    project_config.config_dir_string = project_dir_str;
 
     let mut root_string = root_string_default_or(&args.different_root);
     // set root to the project name not the current_dir

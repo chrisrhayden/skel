@@ -22,6 +22,7 @@ long term:
 - make from a directory
     * Project struct from directory
     * or just copy directory
+- make errors better
 
 
 notes:
