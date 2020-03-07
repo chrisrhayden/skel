@@ -12,7 +12,7 @@ fn make_bash_string(project: &Project) -> String {
 
     bash_string.insert_str(0, "#!/usr/bin/env bash\n\n");
 
-    let root = project.root.to_str().expect("cant get root str");
+    let root = project.root_path.to_str().expect("cant get root str");
 
     let name = &project.name;
 
@@ -57,7 +57,7 @@ pub fn call_build_script(project: &Project) -> Result<(), Box<dyn Error>> {
 
     let bash_string = make_bash_string(project);
 
-    let mut cmd = make_cmd(&project.root, &bash_string);
+    let mut cmd = make_cmd(&project.root_path, &bash_string);
 
     run_cmd(&mut cmd)
 }
