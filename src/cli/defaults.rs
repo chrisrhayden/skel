@@ -2,7 +2,7 @@ use std::{collections::HashMap, env, error::Error, fs, path::PathBuf};
 
 use serde::Deserialize;
 
-use crate::{collect_project_config, Project};
+use crate::{collect_project_config, template::template_str, Project};
 
 use super::parse_args::NewArgs;
 
@@ -53,10 +53,6 @@ fn find_project_file(
     }
 }
 
-fn template_user_config(user_str: &str, old_string: &str) -> String {
-    old_string.replace("{{new-config}}", user_str)
-}
-
 fn project_path_with_templateing(
     type_str: String,
     user_config: UserConfig,
@@ -64,7 +60,7 @@ fn project_path_with_templateing(
 ) -> NewResult<PathBuf> {
     let p_string = find_project_file(user_config, type_str)?;
 
-    let p_string = template_user_config(&config_dir, &p_string);
+    let p_string = template_str(&config_dir, &p_string);
 
     Ok(PathBuf::from(p_string))
 }
@@ -92,15 +88,17 @@ fn config_string_default_or(
     };
 
     // first make the directory
+    config_dir.push('/');
     config_dir.push_str(".config");
     config_dir.push('/');
     config_dir.push_str("new");
 
     // then the actual file
-    let mut config_path = config_dir.clone();
-    config_path.push_str("config.toml");
+    let mut config_file = config_dir.clone();
+    config_file.push('/');
+    config_file.push_str("config.toml");
 
-    (config_path, config_dir)
+    (config_file, config_dir)
 }
 
 fn make_config_from_toml(config_str: &str) -> UserResult {
