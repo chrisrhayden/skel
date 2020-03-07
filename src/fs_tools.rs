@@ -3,12 +3,31 @@
 // NOTE: the std lib said they might change create_dir_all or File::create
 //       make sure to adjust if they do
 
-use std::{error::Error, fs, path::PathBuf};
+use std::{
+    error::Error,
+    fs, io,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     new_rs_error::{NewInnerErrType, NewInnerError},
     project::Project,
 };
+
+pub fn collect_string_from_file<P>(path: P) -> Result<String, io::Error>
+where
+    P: AsRef<Path>,
+{
+    use std::io::Read;
+
+    let mut include_file = fs::File::open(path)?;
+
+    let mut buf = String::new();
+
+    include_file.read_to_string(&mut buf)?;
+
+    Ok(buf)
+}
 
 fn make_project_dirs(project: &Project) -> Result<(), Box<dyn Error>> {
     for dir in project.dir_iter() {
@@ -58,7 +77,7 @@ fn make_project_templates(project: &Project) -> Result<(), Box<dyn Error>> {
 ///! templates are another story
 pub fn make_project_tree(project: &Project) -> Result<(), NewInnerError> {
     // check if something exists at root, root being /path/to/project_name
-    if project.root.exists() {
+    if project.root_path.exists() {
         let root_string = project.root_string();
 
         let err_type = NewInnerErrType::ProjectExists;
@@ -134,7 +153,7 @@ mod test {
             assert!(false, "make_project_files failed");
         }
 
-        let mut main_f = proj.root.clone();
+        let mut main_f = proj.root_path.clone();
         main_f.push("src");
         main_f.push("main.rs");
 
@@ -206,6 +225,7 @@ mod test {
 
         let mut temp = TempSetup::default();
         let root_buf = temp.setup();
+        temp.make_fake_include().expect("cant make include file");
 
         temp.make_fake_project_tree()
             .expect("cant make fake project");
@@ -240,6 +260,23 @@ mod test {
         assert_eq!(
             buf, test_main_file_string,
             "main_file template did not work"
+        );
+
+        let mut include_path = root_buf.clone();
+        include_path.push("test_include");
+
+        let mut include_file =
+            fs::File::open(include_path).expect("cant open include_file");
+
+        let mut include_buf = String::new();
+
+        include_file
+            .read_to_string(&mut include_buf)
+            .expect("cant read include_file");
+
+        assert_eq!(
+            include_buf, "test include value",
+            "did not make include_file right"
         );
     }
 }
