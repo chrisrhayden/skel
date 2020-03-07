@@ -1,19 +1,46 @@
-// error::Error,
-use std::{collections::HashMap, env, fs, path::PathBuf};
+use std::{collections::HashMap, env, error::Error, fs, path::PathBuf};
 
 use serde::Deserialize;
 
-use crate::{Project, collect_project_config};
+use crate::{collect_project_config, Project};
 
 use super::my_utils::get_home_dir;
-use super::{NewArgs, NewResult, project_path_with_templateing };
+use super::NewArgs;
 
+pub type NewResult<T> = Result<T, Box<dyn Error>>;
 pub type UserResult = NewResult<UserConfig>;
 
 #[derive(Debug, Deserialize)]
 pub struct UserConfig {
     pub projects: HashMap<String, String>,
     pub alias: HashMap<String, Vec<String>>,
+}
+
+fn template_user_config(user_str: &str, old_string: &str) -> String {
+    old_string.replace("{{new-config}}", user_str)
+}
+
+fn project_path_with_templateing(
+    args: &NewArgs,
+    user_config: &UserConfig,
+    config_dir: &Option<String>,
+) -> NewResult<PathBuf> {
+    let project_pathbuf = if let Some(proj_str) = args.type_str.as_ref() {
+        let p_string = find_project_file(user_config, &proj_str)?;
+
+        let p_string = if let Some(c_dir) = config_dir {
+            template_user_config(c_dir, &p_string)
+        } else {
+            panic!("did not get project_dir string");
+        };
+
+        PathBuf::from(p_string)
+    } else {
+        // we should not reach this
+        panic!("did not receive the project type or file");
+    };
+
+    Ok(project_pathbuf)
 }
 
 fn root_string_default_or(root: &Option<String>) -> String {
@@ -95,44 +122,7 @@ pub fn config_str_to_user_struct(
     Ok((conf, u_d))
 }
 
-// last takes precedents:
-//      default > config > cli config
-pub fn resolve_default(
-    args: &NewArgs,
-    user_config: &UserConfig,
-    config_dir: &Option<String>,
-) -> NewResult<Project> {
-    // if we dont have a name here we never will
-    let name = match args.name.clone() {
-        None => return Err(Box::from(String::from("did not get name"))),
-        Some(val) => val,
-    };
-
-    let project_pathbuf =
-        project_path_with_templateing(&args, user_config, config_dir)?;
-
-    // return if project path dose not exists, we will be able to make projects
-    // from directory's eventually
-    if !project_pathbuf.exists() {
-        return Err(Box::from(format!(
-            "project path given dos not exists -- {}",
-            project_pathbuf.to_str().unwrap()
-        )));
-    }
-
-    let project_config = collect_project_config(&project_pathbuf)?;
-
-    let mut root_string = root_string_default_or(&args.root);
-    // set root to the project name not the current_dir
-    // or the one given on the cli
-    // TODO: make this generic for windows maybe
-    root_string.push('/');
-    root_string.push_str(&name);
-
-    Ok(Project::new(root_string, name, project_config))
-}
-
-pub fn find_project_file(
+fn find_project_file(
     user_config: &UserConfig,
     type_str: &str,
 ) -> NewResult<String> {
@@ -169,3 +159,39 @@ pub fn find_project_file(
     }
 }
 
+// last takes precedents:
+//      default > config > cli config
+pub fn resolve_default(
+    args: &NewArgs,
+    user_config: &UserConfig,
+    config_dir: &Option<String>,
+) -> NewResult<Project> {
+    // if we dont have a name here we never will
+    let name = match args.name.clone() {
+        None => return Err(Box::from(String::from("did not get name"))),
+        Some(val) => val,
+    };
+
+    let project_pathbuf =
+        project_path_with_templateing(&args, user_config, config_dir)?;
+
+    // return if project path dose not exists, we will be able to make projects
+    // from directory's eventually
+    if !project_pathbuf.exists() {
+        return Err(Box::from(format!(
+            "project path given dos not exists -- {}",
+            project_pathbuf.to_str().unwrap()
+        )));
+    }
+
+    let project_config = collect_project_config(&project_pathbuf)?;
+
+    let mut root_string = root_string_default_or(&args.root);
+    // set root to the project name not the current_dir
+    // or the one given on the cli
+    // TODO: make this generic for windows maybe
+    root_string.push('/');
+    root_string.push_str(&name);
+
+    Ok(Project::new(root_string, name, project_config))
+}
