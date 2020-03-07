@@ -1,0 +1,12 @@
+# the paths to the projects
+# {{config-dir}} will correspond to ~/.config/new
+[projects]
+basic_cpp = "{{config-dir}}/projects/cpp.toml"
+basic_javascript = "{{config-dir}}/projects/javascript.toml"
+basic_python = "{{config-dir}}/projects/python.toml"
+
+# alias's to use on the cli
+[alias]
+basic_cpp = ["cpp", "cp", "c++"]
+basic_javascript = ["js", "j"]
+basic_python = ["py", "p"]
