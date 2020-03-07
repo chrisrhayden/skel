@@ -15,6 +15,7 @@ use crate::{
 // a config to deserialize project files in toml
 #[derive(Debug, Deserialize)]
 pub struct ProjectConfig {
+    pub config_dir_string: Option<String>,
     pub dirs: Vec<String>,
     pub files: Vec<String>,
     pub build: Option<String>,
@@ -35,6 +36,7 @@ pub struct Project {
     pub name: String,
     pub root_path: PathBuf,
     pub root_string: String,
+    pub config_dir_string: String,
     pub dirs: Vec<String>,
     pub files: Vec<String>,
     pub build: Option<String>,
@@ -47,6 +49,9 @@ impl Project {
             name,
             root_path: PathBuf::from(&root),
             root_string: root,
+            config_dir_string: config
+                .config_dir_string
+                .expect("no config string"),
             dirs: config.dirs,
             files: config.files,
             build: config.build,
@@ -62,9 +67,14 @@ impl Project {
         let mut errors: Vec<String> = Vec::new();
 
         for template in self.templates.as_mut().unwrap() {
+            // the include variable is present force the template to whatever
+            // is in the include path if it exists
             if let Some(include_str) = template.include.as_ref() {
-                let include_path =
-                    PathBuf::from(template_str(&self.root_string, include_str));
+                let include_path = PathBuf::from(template_str(
+                    &self.config_dir_string,
+                    include_str,
+                ));
+
                 template.template =
                     Some(collect_string_from_file(include_path)?);
             } else if template.include.is_none() && template.template.is_none()
