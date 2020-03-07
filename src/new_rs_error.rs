@@ -31,6 +31,13 @@ impl NewInnerError {
         Self { err_type, err_str }
     }
 
+    pub fn io_error(err_string: &str) -> Self {
+        Self {
+            err_type: NewInnerErrType::IoError,
+            err_str: err_string.to_owned(),
+        }
+    }
+
     pub fn from_io_err(io_err: Box<dyn Error>) -> NewInnerError {
         let err_string = format!("{:?}", io_err);
 
