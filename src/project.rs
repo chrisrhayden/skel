@@ -7,7 +7,10 @@ use std::{
 use serde::Deserialize;
 use toml;
 
-use crate::template::template;
+use crate::{
+    fs_tools::collect_string_from_file,
+    template::{template, template_str},
+};
 
 // a config to deserialize project files in toml
 #[derive(Debug, Deserialize)]
@@ -20,16 +23,18 @@ pub struct ProjectConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct FileTemplate {
-    pub name: String,
-    pub template: String,
+    pub path: String,
+    pub template: Option<String>,
+    pub include: Option<String>,
 }
 
 // a project struct to hold the project build data
+// the root, current_dir + given on cli plus name, i.e. pwd/project_name
 #[derive(Debug)]
 pub struct Project {
-    // the root, current_dir + given on cli plus name, i.e. pwd/project_name
-    pub root: PathBuf,
     pub name: String,
+    pub root_path: PathBuf,
+    pub root_string: String,
     pub dirs: Vec<String>,
     pub files: Vec<String>,
     pub build: Option<String>,
@@ -39,8 +44,9 @@ pub struct Project {
 impl Project {
     pub fn new(root: String, name: String, config: ProjectConfig) -> Self {
         Self {
-            root: PathBuf::from(root),
             name,
+            root_path: PathBuf::from(&root),
+            root_string: root,
             dirs: config.dirs,
             files: config.files,
             build: config.build,
@@ -48,24 +54,58 @@ impl Project {
         }
     }
 
+    pub fn resolve_templates(&mut self) -> Result<(), Box<dyn Error>> {
+        if self.templates.is_none() {
+            return Ok(());
+        }
+
+        let mut errors: Vec<String> = Vec::new();
+
+        for template in self.templates.as_mut().unwrap() {
+            if let Some(include_str) = template.include.as_ref() {
+                let include_path =
+                    PathBuf::from(template_str(&self.root_string, include_str));
+                template.template =
+                    Some(collect_string_from_file(include_path)?);
+            } else if template.include.is_none() && template.template.is_none()
+            {
+                errors.push(template.path.to_owned());
+            }
+        }
+
+        if !errors.is_empty() {
+            let error_string = format!(
+                "template['s] missing include path or template string -- {}",
+                errors.join(", ")
+            );
+
+            Err(Box::from(error_string))
+        } else {
+            Ok(())
+        }
+    }
+
     pub fn root_string(&self) -> String {
-        self.root.to_str().expect("cant get root string").to_owned()
+        self.root_path
+            .to_str()
+            .expect("cant get root string")
+            .to_owned()
     }
 
     pub fn dir_iter(&self) -> ProjectPathIterator {
-        let root = self.root.to_str().expect("cant covert path to str");
+        let root = self.root_path.to_str().expect("cant covert path to str");
 
         ProjectPathIterator::new(root, &self.name, &self.dirs)
     }
 
     pub fn file_iter(&self) -> ProjectPathIterator {
-        let root = self.root.to_str().expect("cant covert path to str");
+        let root = self.root_path.to_str().expect("cant covert path to str");
 
         ProjectPathIterator::new(root, &self.name, &self.files)
     }
 
     pub fn template_iter(&self) -> Option<ProjectTemplateIterator> {
-        let root = self.root.to_str().expect("cant covert path to str");
+        let root = self.root_path.to_str().expect("cant covert path to str");
 
         match &self.templates {
             Some(templates) => {
@@ -172,9 +212,14 @@ impl<'a> Iterator for ProjectTemplateIterator<'a> {
 
         self.curr += 1;
 
-        let template_string = self.template(&next_to_template.template);
+        // NOTE: idk if i want a missing template to be an error or not
+        let template_string = if next_to_template.template.is_some() {
+            self.template(next_to_template.template.as_ref().unwrap())
+        } else {
+            String::new()
+        };
 
-        let path_name = &next_to_template.name;
+        let path_name = &next_to_template.path;
 
         let mut path_buf = self.root_buf.clone();
 
@@ -349,6 +394,7 @@ mod test {
             .expect("cant use fake toml file");
 
         let mut root = String::from("/tmp/test_root");
+
         let name = String::from("test_project");
 
         root.push('/');
@@ -387,5 +433,30 @@ mod test {
 
         assert_eq!(second.0, second_test.0, "second path is not the same");
         assert_eq!(second.1, second_test.1, "second string is not the same");
+    }
+
+    #[test]
+    fn test_resolve_templates() {
+        let mut temp = TempSetup::default();
+        temp.setup();
+        temp.make_fake_include().expect("cant make include file");
+
+        let project = temp.project.as_mut().unwrap();
+
+        match project.resolve_templates() {
+            Ok(_) => assert!(true),
+            Err(err) => {
+                assert!(false, "{}", err);
+            }
+        };
+
+        let mut temp_iter = project.template_iter().unwrap();
+
+        let (include_path, include_str) = temp_iter.nth(2).unwrap();
+
+        assert_eq!(
+            include_str, "test include value\n",
+            "include values dont match"
+        );
     }
 }
