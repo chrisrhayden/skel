@@ -10,13 +10,14 @@ mod test_utils;
 
 use std::error::Error;
 
-pub use crate::project::{
-    collect_project_config, FileTemplate, Project, ProjectConfig,
+use crate::{
+    fs_tools::make_project_tree, project::collect_project_config,
+    system_tools::call_build_script,
 };
 
-use crate::{fs_tools::make_project_tree, system_tools::call_build_script};
+pub use crate::project::Project;
 
-///! make a new project from a Poject struct
+///! make a new project from a Project struct
 pub fn make_project(project: &Project) -> Result<(), Box<dyn Error>> {
     // first make the project tree
     if let Err(err) = make_project_tree(project) {
