@@ -5,11 +5,11 @@ use clap::{App, Arg, ArgMatches};
 // TODO: consider using the &str's form clap instead of new strings
 #[derive(Default)]
 pub struct NewArgs {
-    pub root: Option<String>,
-    pub name: Option<String>,
-    pub type_user_config: bool,
-    pub type_str: Option<String>,
-    pub user_config_path: Option<String>,
+    pub name: String,
+    pub type_str: String,
+    pub different_root: Option<String>,
+    pub cli_config_path: Option<String>,
+    pub cli_project_file: Option<String>,
 }
 
 fn get_arg_matches() -> ArgMatches {
@@ -61,6 +61,8 @@ pub fn parse_args() -> Result<NewArgs, Box<dyn Error>> {
     let root = matches.value_of("different root");
     let config_path = matches.value_of("different config");
 
+    // TODO: make clap actually do the semantics of this
+    //       or maybe use another lib
     if project_type.is_some() && project_file.is_some() && name.is_some() {
         return Err(Box::from(String::from("to many args given")));
     } else if name.is_none()
@@ -71,30 +73,28 @@ pub fn parse_args() -> Result<NewArgs, Box<dyn Error>> {
 
     let mut new_args = NewArgs::default();
 
-    new_args.root = root.map(String::from);
-    new_args.user_config_path = config_path.map(String::from);
-
-    // TODO: make clap do this or find something else maybe
     if project_type.is_some() && project_file.is_none() {
-        new_args.type_str = project_type.map(String::from);
-
-        new_args.type_user_config = true;
-    } else if project_type.is_some() && project_file.is_some() && name.is_none()
-    {
-        new_args.type_str = project_file.map(String::from);
-
-        new_args.type_user_config = false;
+        new_args.type_str = project_type
+            .map(String::from)
+            .expect("cant unwrap project type");
     } else {
-        return Err(Box::from(String::from("bad arg")));
+        return Err(Box::from(String::from("bad args")));
     };
 
     if name.is_none() && project_type.is_some() {
-        new_args.name = project_type.map(String::from);
+        new_args.name = project_type
+            .map(String::from)
+            .expect("cant unwrap project type");
     } else if name.is_some() {
-        new_args.name = name.map(String::from);
+        new_args.name =
+            name.map(String::from).expect("cant unwrap project type");
     } else {
         return Err(Box::from(String::from("bad args or bad parsing of args")));
     };
+
+    new_args.different_root = root.map(String::from);
+    new_args.cli_project_file = project_file.map(String::from);
+    new_args.cli_config_path = config_path.map(String::from);
 
     Ok(new_args)
 }
