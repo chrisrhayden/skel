@@ -1,34 +1,16 @@
+///! just a wrapper around the lib interface and the cli interface
+use std::error::Error;
+
 use new_rs::{
-    cli::config_str_to_user_struct, make_project, parse_args, resolve_default,
+    cli::{parse_args, resolve_default},
+    make_project,
 };
 
-fn main() {
-    let args = match parse_args() {
-        Err(err) => {
-            eprintln!("{}", err);
-            return;
-        }
-        Ok(val) => val,
-    };
+// holy shit this is nice, though the errors might not be good for users
+fn main() -> Result<(), Box<dyn Error>> {
+    let args = parse_args()?;
 
-    let (user_config, config_dir) =
-        match config_str_to_user_struct(&args.user_config_path) {
-            Ok(val) => val,
-            Err(err) => {
-                eprintln!("{}", err);
-                return;
-            }
-        };
+    let project = resolve_default(args)?;
 
-    let project = match resolve_default(&args, &user_config, &config_dir) {
-        Ok(val) => val,
-        Err(err) => {
-            eprintln!("{}", err);
-            return;
-        }
-    };
-
-    if let Err(err) = make_project(&project) {
-        eprintln!("{}", err);
-    }
+    make_project(&project)
 }
