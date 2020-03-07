@@ -9,9 +9,9 @@ use crate::project::{Project, ProjectConfig};
 
 #[derive(Default)]
 pub struct TempSetup {
-    root: PathBuf,
-    temp: Option<TempDir>,
-    project: Option<Project>,
+    pub root: PathBuf,
+    pub temp: Option<TempDir>,
+    pub project: Option<Project>,
 }
 
 impl TempSetup {
@@ -92,6 +92,20 @@ impl TempSetup {
 
         Ok(())
     }
+
+    pub fn make_fake_include(&self) -> Result<(), Box<dyn Error>> {
+        use std::io::Write;
+
+        let mut fake_inlcude = self.root_buf();
+
+        fake_inlcude.push("test_include");
+
+        let mut include_file = fs::File::create(fake_inlcude)?;
+
+        include_file.write_all(b"test include value")?;
+
+        Ok(())
+    }
 }
 
 impl Drop for TempSetup {
@@ -143,15 +157,19 @@ if [[ -d test_project ]]; then
 fi"""
 
 [[templates]]
-name = "src/main.rs"
+path = "src/main.rs"
 template = """fn main() {
     println!("hello {{name}}");
 }
 """
 
 [[templates]]
-name ="tests/test_main.rs"
+path ="tests/test_main.rs"
 template = "// no tests yet for {{name}}"
+
+[[templates]]
+path = "src/test_include"
+include = "docs/test_include.txt"
 "#
     .to_string()
 }
