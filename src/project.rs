@@ -18,48 +18,25 @@ pub struct ProjectConfig {
     pub templates: Option<Vec<FileTemplate>>,
 }
 
-// just impl new for ease of use
-impl ProjectConfig {
-    pub fn new(
-        dirs: Vec<String>,
-        files: Vec<String>,
-        build: Option<String>,
-        templates: Option<Vec<FileTemplate>>,
-    ) -> Self {
-        Self {
-            dirs,
-            files,
-            build,
-            templates,
-        }
-    }
-}
-
 #[derive(Debug, Deserialize)]
 pub struct FileTemplate {
     pub name: String,
     pub template: String,
 }
 
-// a project struct to eventually use to make the project
+// a project struct to hold the project build data
 #[derive(Debug)]
 pub struct Project {
-    // the root, current_dir/given on cli plus name
+    // the root, current_dir + given on cli plus name, i.e. pwd/project_name
     pub root: PathBuf,
-    // the project name
     pub name: String,
-    // a vec of directory's to make
     pub dirs: Vec<String>,
-    // a vec of file's to make
     pub files: Vec<String>,
-    // a build script to make and run
     pub build: Option<String>,
     pub templates: Option<Vec<FileTemplate>>,
 }
 
 impl Project {
-    // the root and name should be resolve before here
-    // the config should just be the things to make not where
     pub fn new(root: String, name: String, config: ProjectConfig) -> Self {
         Self {
             root: PathBuf::from(root),
@@ -76,31 +53,19 @@ impl Project {
     }
 
     pub fn dir_iter(&self) -> ProjectPathIterator {
-        let root = self
-            .root
-            .as_os_str()
-            .to_str()
-            .expect("cant covert path to str");
+        let root = self.root.to_str().expect("cant covert path to str");
 
         ProjectPathIterator::new(root, &self.name, &self.dirs)
     }
 
     pub fn file_iter(&self) -> ProjectPathIterator {
-        let root = self
-            .root
-            .as_os_str()
-            .to_str()
-            .expect("cant covert path to str");
+        let root = self.root.to_str().expect("cant covert path to str");
 
         ProjectPathIterator::new(root, &self.name, &self.files)
     }
 
     pub fn template_iter(&self) -> Option<ProjectTemplateIterator> {
-        let root = self
-            .root
-            .as_os_str()
-            .to_str()
-            .expect("cant covert path to str");
+        let root = self.root.to_str().expect("cant covert path to str");
 
         match &self.templates {
             Some(templates) => {
