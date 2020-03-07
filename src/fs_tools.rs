@@ -5,7 +5,7 @@
 
 use std::{
     error::Error,
-    fs, io,
+    fs,
     path::{Path, PathBuf},
 };
 
@@ -14,13 +14,22 @@ use crate::{
     project::Project,
 };
 
-pub fn collect_string_from_file<P>(path: P) -> Result<String, io::Error>
+pub fn collect_string_from_file<P>(path: P) -> Result<String, Box<dyn Error>>
 where
-    P: AsRef<Path>,
+    P: AsRef<Path> + std::fmt::Debug,
 {
     use std::io::Read;
 
-    let mut include_file = fs::File::open(path)?;
+    let mut include_file = match fs::File::open(&path) {
+        // TODO: match the specific error
+        Ok(val) => val,
+        Err(_) => {
+            return Err(Box::from(format!(
+                "missing template include path - {:?}",
+                path
+            )))
+        }
+    };
 
     let mut buf = String::new();
 
