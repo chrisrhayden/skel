@@ -1,6 +1,7 @@
 # TODO: find out if the top level variables need to be first
 
 test:
+- make NewInnerError methoids for from_io_error and from_toml_error
 - add a way to not run build script or templates
 - make test for optional config variables
 - test for failures
