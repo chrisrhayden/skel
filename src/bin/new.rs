@@ -10,7 +10,9 @@ use new_rs::{
 fn main() -> Result<(), Box<dyn Error>> {
     let args = parse_args()?;
 
-    let project = resolve_default(args)?;
+    let mut project = resolve_default(args)?;
+
+    project.resolve_templates()?;
 
     make_project(&project)
 }
