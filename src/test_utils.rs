@@ -111,9 +111,7 @@ pub fn make_fake_config() -> ProjectConfig {
 
 pub fn make_fake_project(root: Option<PathBuf>) -> Project {
     let mut root: String = if let Some(root) = root {
-        String::from(
-            root.as_os_str().to_str().expect("cant get temp path a str"),
-        )
+        String::from(root.to_str().expect("cant get temp path a str"))
     } else {
         String::from("/tmp/test_root")
     };
