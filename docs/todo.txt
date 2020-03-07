@@ -1,7 +1,6 @@
 # TODO: find out if the top level variables need to be first
 
 test:
-- make NewInnerError methoids for from_io_error and from_toml_error
 - add a way to not run build script or templates
 - make test for optional config variables
 - test for failures
@@ -12,6 +11,9 @@ short term:
 - check if paths are relative or absolute
 - cli args
 - add include file to config
+- make NewInnerError print nice errors for things the user will encounter like
+  the project exists. this will be so we can just print errors to the user
+
 long term:
 - make config use a single project dir and look up the given name or alias from
   the file system
@@ -24,3 +26,6 @@ long term:
 
 notes:
 - i dont like that Project::new is where defaults are set
+
+done:
+- [x] make NewInnerError methoids for from_io_error 
