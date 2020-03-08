@@ -1,10 +1,13 @@
 // these fucking suck
-pub fn template(root: &str, name: &str, old_string: &str) -> String {
+pub fn template(
+    root: &str,
+    name: &str,
+    config: &str,
+    old_string: &str,
+) -> String {
     let new_string = old_string.replace("{{root}}", root);
 
-    new_string.replace("{{name}}", name)
-}
+    let new_string = new_string.replace("{{config-dir}}", config);
 
-pub fn template_config(replace_with: &str, old_string: &str) -> String {
-    old_string.replace("{{config-dir}}", replace_with)
+    new_string.replace("{{name}}", name)
 }
