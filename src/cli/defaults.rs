@@ -2,7 +2,7 @@ use std::{collections::HashMap, env, error::Error, fs, path::PathBuf};
 
 use serde::Deserialize;
 
-use crate::{collect_project_config, template::template_str, Project};
+use crate::{collect_project_config, template::template_config, Project};
 
 use super::parse_args::NewArgs;
 
@@ -60,7 +60,7 @@ fn project_path_with_templateing(
 ) -> NewResult<PathBuf> {
     let p_string = find_project_file(user_config, type_str)?;
 
-    let p_string = template_str(&config_dir, &p_string);
+    let p_string = template_config(&config_dir, &p_string);
 
     Ok(PathBuf::from(p_string))
 }
