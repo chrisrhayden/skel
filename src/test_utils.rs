@@ -142,10 +142,8 @@ impl Drop for TempSetup {
 pub fn make_fake_project_config() -> ProjectConfig {
     let fake_toml = make_fake_project_toml();
 
-    let mut conf = toml::from_str::<ProjectConfig>(&fake_toml)
+    let conf = toml::from_str::<ProjectConfig>(&fake_toml)
         .expect("cant make config from fake toml");
-
-    conf.config_dir_string = Some(String::from("/tmp/fake_config.toml"));
 
     conf
 }
@@ -157,9 +155,9 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
         String::from("/tmp/test_root")
     };
 
-    let mut conf = make_fake_project_config();
+    let conf = make_fake_project_config();
 
-    conf.resolve_files();
+    let conf_path = String::from("/tmp/fake_config/config.toml");
 
     let name = String::from("test_project");
 
@@ -168,7 +166,7 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
 
     let args = SkelArgs::make_fake(&name, "fake_type");
 
-    Project::new(root, &args, conf)
+    Project::new(root, conf_path, &args, conf)
 }
 
 pub fn make_fake_user_config() -> UserConfig {
