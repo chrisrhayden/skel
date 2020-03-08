@@ -22,17 +22,26 @@ fn make_bash_string(project: &Project) -> String {
 fn make_cmd(root: &PathBuf, bash_str: &str) -> Command {
     let mut cmd: Command = Command::new("bash");
 
-    cmd.current_dir(root);
-
     cmd.arg("-c");
 
     cmd.arg(bash_str);
+
+    // only switch dirs if the root has been made
+    if root.exists() {
+        cmd.current_dir(root);
+    }
 
     cmd
 }
 
 fn run_cmd(cmd: &mut Command) -> Result<(), Box<dyn Error>> {
-    let output = cmd.output()?;
+    println!("{:?}", cmd);
+    let output = match cmd.output() {
+        Ok(val) => val,
+        Err(err) => {
+            return Err(Box::from(format!("Bad Command: {}", err)));
+        }
+    };
 
     if output.status.success() {
         if !output.stdout.is_empty() {
@@ -51,7 +60,7 @@ fn run_cmd(cmd: &mut Command) -> Result<(), Box<dyn Error>> {
 pub fn call_build_script(project: &Project) -> Result<(), Box<dyn Error>> {
     if project.build.is_none() {
         return Err(Box::from(String::from(
-            "call_build_script was caled without a build script to use",
+            "call_build_script was called without a build script to use",
         )));
     }
 
