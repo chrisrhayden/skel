@@ -25,7 +25,7 @@ pub fn make_project(project: &Project) -> Result<(), Box<dyn Error>> {
     };
 
     // then try and run a build script
-    if project.build.is_some() {
+    if project.run_build && project.build.is_some() {
         call_build_script(project)
     } else {
         Ok(())
