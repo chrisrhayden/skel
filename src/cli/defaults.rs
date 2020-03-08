@@ -56,18 +56,14 @@ fn find_project_file(
 fn project_path_with_templateing(
     type_str: &str,
     user_config: &UserConfig,
-    config_dir: &Option<String>,
+    config_dir: &str,
 ) -> SkelResult<PathBuf> {
     let p_string = find_project_file(user_config, type_str)?;
 
-    if let Some(config_dir) = config_dir {
-        // this is lame but the only place empty string are used
-        let p_string = template("", "", &config_dir, &p_string);
+    // this is lame but the only place empty string are used
+    let p_string = template("", "", &config_dir, &p_string);
 
-        Ok(PathBuf::from(p_string))
-    } else {
-        Ok(PathBuf::from(p_string))
-    }
+    Ok(PathBuf::from(p_string))
 }
 
 fn root_string_default_or(root_from_cli: &Option<String>) -> String {
@@ -84,13 +80,8 @@ fn root_string_default_or(root_from_cli: &Option<String>) -> String {
 }
 
 // TODO: make the path delimiter and config name variables
-fn config_string_default_or(
-    config_path_from_cli: &Option<String>,
-) -> (String, Option<String>) {
-    let mut config_dir = match config_path_from_cli {
-        Some(config_path) => return (config_path.clone(), None),
-        None => env::var("HOME").expect("cant get env var HOME"),
-    };
+fn config_string_default() -> (String, String) {
+    let mut config_dir = env::var("HOME").expect("home not set");
 
     // first make the directory
     config_dir.push('/');
@@ -103,7 +94,7 @@ fn config_string_default_or(
     config_file.push('/');
     config_file.push_str("config.toml");
 
-    (config_file, Some(config_dir))
+    (config_file, config_dir)
 }
 
 fn make_config_from_toml(config_str: &str) -> UserConfigResult {
@@ -135,10 +126,8 @@ fn make_config_from_toml(config_str: &str) -> UserConfigResult {
     Ok(toml_conf)
 }
 
-fn collect_user_config(
-    config_path: &Option<String>,
-) -> SkelResult<(UserConfig, Option<String>)> {
-    let (u_s, u_d) = config_string_default_or(config_path);
+fn collect_user_config() -> SkelResult<(UserConfig, String)> {
+    let (u_s, u_d) = config_string_default();
 
     let conf = make_config_from_toml(&u_s)?;
 
@@ -149,10 +138,13 @@ fn collect_user_config(
 //      default > config > cli config
 pub fn resolve_default(args: SkelArgs) -> SkelResult<Project> {
     let (project_pathbuf, project_dir_str) = match &args.cli_project_file {
-        Some(project_file) => (PathBuf::from(project_file), None),
+        Some(project_file) => {
+            let config_dir_path = env::var("HOME").expect("HOME is not set");
+
+            (PathBuf::from(project_file), config_dir_path)
+        }
         None => {
-            let (user_config, config_dir_path) =
-                collect_user_config(&args.cli_config_path)?;
+            let (user_config, config_dir_path) = collect_user_config()?;
 
             (
                 project_path_with_templateing(
@@ -173,9 +165,7 @@ pub fn resolve_default(args: SkelArgs) -> SkelResult<Project> {
         )));
     }
 
-    let mut project_config = collect_project_config(&project_pathbuf)?;
-
-    project_config.config_dir_string = project_dir_str;
+    let project_config = collect_project_config(&project_pathbuf)?;
 
     let mut root_string = root_string_default_or(&args.different_root);
     // set root to the project name not the current_dir
@@ -184,9 +174,12 @@ pub fn resolve_default(args: SkelArgs) -> SkelResult<Project> {
     root_string.push('/');
     root_string.push_str(&args.name);
 
-    project_config.resolve_files();
-
-    Ok(Project::new(root_string, &args, project_config))
+    Ok(Project::new(
+        root_string,
+        project_dir_str,
+        &args,
+        project_config,
+    ))
 }
 
 #[cfg(test)]
@@ -197,8 +190,7 @@ mod test {
 
     #[test]
     fn test_config_string_default_or_default() {
-        let (test_config_path, test_config_dir) =
-            config_string_default_or(&None);
+        let (test_config_path, test_config_dir) = config_string_default();
 
         let mut config_dir = env::var("HOME").expect("HOME not set");
 
@@ -214,32 +206,13 @@ mod test {
         config_file.push_str("config.toml");
 
         assert_eq!(
-            test_config_dir,
-            Some(config_dir),
+            test_config_dir, config_dir,
             "config_string_default_or did not make dir right"
         );
 
         assert_eq!(
             test_config_path, config_file,
             "did not make config_dir_path right"
-        );
-    }
-
-    #[test]
-    fn test_config_string_default_or_user_provided() {
-        let (test_config_path, test_config_dir) = config_string_default_or(
-            &Some(String::from("/tmp/fake_config.toml")),
-        );
-
-        assert_eq!(
-            test_config_dir, None,
-            "got config dir when there should be one"
-        );
-
-        assert_eq!(
-            test_config_path,
-            String::from("/tmp/fake_config.toml"),
-            "did not make user_config_path right"
         );
     }
 
@@ -287,7 +260,7 @@ mod test {
         let project_path = match project_path_with_templateing(
             "cp",
             &conf,
-            &Some(fake_config_dir),
+            &fake_config_dir,
         ) {
             Err(err) => {
                 assert!(false, "{}", err);
