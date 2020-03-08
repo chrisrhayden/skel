@@ -3,7 +3,7 @@ use std::error::Error;
 use clap::{App, Arg, ArgMatches};
 
 // TODO: consider using the &str's form clap instead of new strings
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct NewArgs {
     pub name: String,
     pub type_str: String,
@@ -69,6 +69,7 @@ fn get_arg_matches() -> ArgMatches {
             Arg::with_name("no build")
                 .short('n')
                 .long("no-build")
+                .takes_value(false)
                 .help("dont run the build script"),
         )
         .arg(
@@ -124,8 +125,8 @@ pub fn parse_args() -> Result<NewArgs, Box<dyn Error>> {
     new_args.cli_project_file = project_file.map(String::from);
     new_args.cli_config_path = config_path.map(String::from);
 
-    new_args.dont_make_templates = matches.is_present("no-templates");
-    new_args.dont_run_build = matches.is_present("no-build");
+    new_args.dont_make_templates = matches.is_present("no templating");
+    new_args.dont_run_build = matches.is_present("no build");
 
     Ok(new_args)
 }
