@@ -8,43 +8,38 @@ skel takes a project type and a name and will make the project in to that name
 skel cp name
 ```
 
-the user config looks like
+the user config is located at ~/.config/skel/config.toml
+you can template the paths
+an example config
 
 ```toml
 # the paths to the projects
 # {{config-dir}} will correspond to ~/.config/skel
 [projects]
-basic_cpp        = "{{config-dir}}/projects/cpp.toml"
 basic_javascript = "{{config-dir}}/projects/javascript.toml"
-basic_python     = "{{config-dir}}/projects/python.toml"
 
 # alias's to use on the cli
 [alias]
-basic_cpp        = ["cpp", "cp", "c++"]
-basic_javascript = ["js"]
-basic_python     = ["py", "p"]
+basic_javascript = ["js", "j"]
 ```
 
-and a project config looks like
+all strings will be run through a template
+project toml files have a few more slugs
+the slugs so far are:
+    - {{root}} = the root project directory (e.g. /tmp/example_project)
+    - {{name}} = the new project name (e.g. cool_cli_tool)
+    - {{config-dir}} = the config dir used this instance
+
+example:
+  src = "{{root}}/src" = "/tmp/example_project/src"
+  main = "{{root}}/src/main.js" = "/tmp/example_project/src/main.rs"
+
+make all directory's listed
+this wont fail on already made dirs,
+so having the same dirs is fine (e.g. dirs = ["src", "src"])
+each dir will correspond to the linux cmd `mkdir -p path/to/dir`
 
 ```toml
-# all file's/directory's will be made to the root level
-#   `src/foo` will turn in to /current/path/test_js_project/src/foo
-
-# all strings will be run through a template
-# the slugs so far are:
-#     - {{root}} = the root project directory (e.g. /tmp/example_project)
-#     - {{name}} = the new project name (e.g. cool_cli_tool)
-#     - {{config-dir}} = the config dir used this instance
-#
-# example:
-#   src = "{{root}}/src" = "/tmp/example_project/src"
-#   main = "{{root}}/src/main.js" = "/tmp/example_project/src/main.rs"
-
-# make all directory's listed
-# this wont fail on already made dirs,
-# so having the same dirs is fine (e.g. dirs = ["src", "src"])
-# each dir will correspond to the linux cmd `mkdir -p path/to/dir`
 # so you could skip `src` if you make `src/foo` (e.g. dirs = ["src/foo"])
 dirs = [
     "src",
@@ -56,7 +51,6 @@ dirs = [
 files = [
     "src/main.js",
     "src/foo/{{name}}.txt"
-    ".eslint.json",
 ]
 
 
