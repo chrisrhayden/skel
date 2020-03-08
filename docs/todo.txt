@@ -1,32 +1,17 @@
-# TODO: find out if the top level variables need to be first
+short term:
+- check if paths are relative or absolute
+- add a way to not run build script or templates
+- use a templating library
+
+long term:
+- make errors better
 
 test:
-- add a way to not run build script or templates
 - make test for optional config variables
+- make test for cli interface
 - test for failures
     * there are templates that aren't in the file list
 
-short term:
-- make cli interface batter
-- check if paths are relative or absolute
-- cli args
-- add include file to config
-- make NewInnerError print nice errors for things the user will encounter like
-  the project exists. this will be so we can just print errors to the user
-
-long term:
-- make config use a single project dir and look up the given name or alias from
-  the file system
-- better templating
-    * use a templating library
-- make from a directory
-    * Project struct from directory
-    * or just copy directory
-- make errors better
-
-
-notes:
-- i dont like that Project::new is where defaults are set
-
 done:
-- [x] make NewInnerError methoids for from_io_error 
+- make NewInnerError methoids for from_io_error 
+- add include file to config
