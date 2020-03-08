@@ -31,7 +31,6 @@ fn make_cmd(root: &PathBuf, bash_str: &str) -> Command {
 }
 
 fn run_cmd(cmd: &mut Command) -> Result<(), Box<dyn Error>> {
-    println!("{:?}", cmd);
     let output = match cmd.output() {
         Ok(val) => val,
         Err(err) => {
@@ -41,7 +40,7 @@ fn run_cmd(cmd: &mut Command) -> Result<(), Box<dyn Error>> {
 
     if output.status.success() {
         if !output.stdout.is_empty() {
-            println!("{}", String::from_utf8_lossy(&output.stdout));
+            print!("{}", String::from_utf8_lossy(&output.stdout));
         }
 
         Ok(())
