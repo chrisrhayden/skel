@@ -1,3 +1,33 @@
+# Skel
+
+make a project layout from a toml file
+
+## Getting started
+skel takes a project type and a name and will make the project in to that name
+```bash
+skel cp name
+```
+
+the user config looks like
+
+```toml
+# the paths to the projects
+# {{config-dir}} will correspond to ~/.config/skel
+[projects]
+basic_cpp        = "{{config-dir}}/projects/cpp.toml"
+basic_javascript = "{{config-dir}}/projects/javascript.toml"
+basic_python     = "{{config-dir}}/projects/python.toml"
+
+# alias's to use on the cli
+[alias]
+basic_cpp        = ["cpp", "cp", "c++"]
+basic_javascript = ["js"]
+basic_python     = ["py", "p"]
+```
+
+and a project config looks like
+
+```toml
 # all file's/directory's will be made to the root level
 #   `src/foo` will turn in to /current/path/test_js_project/src/foo
 
@@ -71,3 +101,4 @@ path  = ".eslint.json"
 # use a file a ~/.config/skel/projects/javascript.eslint
 # instead of a template string
 include = "{{config-dir}}/projects/basic_javascript/javascript.eslint"
+```
