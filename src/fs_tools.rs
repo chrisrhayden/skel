@@ -98,10 +98,10 @@ pub fn make_project_tree(project: &Project) -> Result<(), NewInnerError> {
 
     make_project_files(project).map_err(NewInnerError::from_io_err)?;
 
-    if project.make_template {
-        make_project_templates(project).map_err(NewInnerError::from_io_err)
-    } else {
+    if project.dont_make_template {
         Ok(())
+    } else {
+        make_project_templates(project).map_err(NewInnerError::from_io_err)
     }
 }
 
