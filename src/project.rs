@@ -40,8 +40,8 @@ pub struct Project {
     pub files: Vec<String>,
     pub build: Option<String>,
     pub templates: Option<Vec<FileTemplate>>,
-    pub make_template: bool,
-    pub run_build: bool,
+    pub dont_make_template: bool,
+    pub dont_run_build: bool,
 }
 
 impl Project {
@@ -57,8 +57,8 @@ impl Project {
             files: config.files,
             build: config.build,
             templates: config.templates,
-            make_template: args.make_templates,
-            run_build: args.run_build,
+            dont_make_template: args.dont_make_templates,
+            dont_run_build: args.dont_run_build,
         }
     }
 
