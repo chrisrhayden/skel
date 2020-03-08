@@ -184,6 +184,8 @@ pub fn resolve_default(args: NewArgs) -> NewResult<Project> {
     root_string.push('/');
     root_string.push_str(&args.name);
 
+    project_config.resolve_files();
+
     Ok(Project::new(root_string, &args, project_config))
 }
 
