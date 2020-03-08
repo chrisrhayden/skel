@@ -5,7 +5,7 @@
 
 use std::{
     error::Error,
-    fs,
+    fs, io,
     path::{Path, PathBuf},
 };
 
@@ -54,12 +54,14 @@ fn make_project_files(project: &Project) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn write_template(template: (PathBuf, String)) -> Result<(), Box<dyn Error>> {
+fn write_template(
+    (template_path, template): (PathBuf, String),
+) -> Result<(), io::Error> {
     use std::io::Write;
 
-    let mut template_file = fs::File::create(template.0)?;
+    let mut template_file = fs::File::create(template_path)?;
 
-    template_file.write_all(template.1.as_bytes())?;
+    template_file.write_all(template.as_bytes())?;
 
     Ok(())
 }
@@ -177,19 +179,6 @@ mod test {
         }
     }
 
-    // make_project_files should fail when called without the folder structure
-    #[test]
-    fn test_make_project_files_fails() {
-        let proj = make_fake_project(None);
-
-        if let Err(_) = make_project_files(&proj) {
-            // TODO: test for specific failure maybe
-            assert!(true);
-        } else {
-            assert!(false, "make_project_files worked?");
-        }
-    }
-
     #[test]
     fn test_make_project_root_exits() {
         let mut temp = TempSetup::default();
@@ -219,17 +208,6 @@ mod test {
         };
 
         assert!(true);
-    }
-
-    #[test]
-    fn test_make_project_templates_failes() {
-        let proj = make_fake_project(None);
-
-        if let Err(_) = make_project_templates(&proj) {
-            assert!(true);
-        } else {
-            assert!(false, "files where made");
-        }
     }
 
     #[test]
