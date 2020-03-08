@@ -10,23 +10,38 @@ pub struct NewArgs {
     pub different_root: Option<String>,
     pub cli_config_path: Option<String>,
     pub cli_project_file: Option<String>,
+    pub run_build: bool,
+    pub make_templates: bool,
+}
+
+impl NewArgs {
+    pub fn make_fake(name: &str, type_str: &str) -> Self {
+        Self {
+            name: name.to_owned(),
+            type_str: type_str.to_owned(),
+            different_root: None,
+            cli_config_path: None,
+            cli_project_file: None,
+            run_build: true,
+            make_templates: true,
+        }
+    }
 }
 
 fn get_arg_matches() -> ArgMatches {
     App::new("new -- a project maker")
-        .about("makes projects from a toml file")
-        .version("0")
+        .about("make a project from a toml file")
         .arg(
             Arg::with_name("TYPE")
                 .takes_value(true)
                 .required_unless("project file")
-                .help("a project type to make"),
+                .help("a project type or alias to make"),
         )
         .arg(
             Arg::with_name("NAME")
                 .takes_value(true)
                 .required(false)
-                .help("the project to make"),
+                .help("the name of the project to make"),
         )
         .arg(
             Arg::with_name("project file")
@@ -34,7 +49,7 @@ fn get_arg_matches() -> ArgMatches {
                 .long("project-file")
                 .value_name("FILE")
                 .takes_value(true)
-                .help("a project file"),
+                .help("a project file to use instead of looking one up"),
         )
         .arg(
             Arg::with_name("different root")
@@ -46,8 +61,21 @@ fn get_arg_matches() -> ArgMatches {
         .arg(
             Arg::with_name("different config")
                 .short('c')
-                .long("different config")
-                .value_name("FILE"),
+                .long("different-config")
+                .value_name("FILE")
+                .help("use FILE instead of the default config file"),
+        )
+        .arg(
+            Arg::with_name("no build")
+                .short('n')
+                .long("no-build")
+                .help("dont run the build script"),
+        )
+        .arg(
+            Arg::with_name("no templating")
+                .short('N')
+                .long("no-templating")
+                .help("dont make templates"),
         )
         .get_matches()
 }
