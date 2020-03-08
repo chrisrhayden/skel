@@ -5,7 +5,10 @@ use tempfile::{tempdir, TempDir};
 
 use toml;
 
-use crate::project::{Project, ProjectConfig};
+use crate::{
+    cli::{NewArgs, UserConfig},
+    project::{Project, ProjectConfig},
+};
 
 #[derive(Default)]
 pub struct TempSetup {
@@ -93,6 +96,26 @@ impl TempSetup {
         Ok(())
     }
 
+    pub fn make_fake_user_config(&self) -> Result<(), Box<dyn Error>> {
+        use std::io::Write;
+
+        let mut fake_config = self.root_buf();
+
+        fake_config.push("fake_new");
+
+        fs::create_dir_all(&fake_config).expect("cant make config dir");
+
+        fake_config.push("fake_config.toml");
+
+        let mut config_file = fs::File::create(fake_config)?;
+
+        let toml_str = make_fake_user_toml();
+
+        config_file.write_all(toml_str.as_bytes())?;
+
+        Ok(())
+    }
+
     pub fn make_fake_include(&self) -> Result<(), Box<dyn Error>> {
         use std::io::Write;
 
@@ -116,11 +139,15 @@ impl Drop for TempSetup {
     }
 }
 
-pub fn make_fake_config() -> ProjectConfig {
-    let fake_toml = make_fake_toml();
+pub fn make_fake_project_config() -> ProjectConfig {
+    let fake_toml = make_fake_project_toml();
 
-    toml::from_str::<ProjectConfig>(&fake_toml)
-        .expect("cant make config from fake toml")
+    let mut conf = toml::from_str::<ProjectConfig>(&fake_toml)
+        .expect("cant make config from fake toml");
+
+    conf.config_dir_string = Some(String::from("/tmp/fake_config.toml"));
+
+    conf
 }
 
 pub fn make_fake_project(root: Option<PathBuf>) -> Project {
@@ -130,17 +157,44 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
         String::from("/tmp/test_root")
     };
 
-    let conf = make_fake_config();
+    let conf = make_fake_project_config();
 
     let name = String::from("test_project");
 
     root.push('/');
     root.push_str(&name);
 
-    Project::new(root, name, conf)
+    let args = NewArgs::make_fake(&name, "fake_type");
+
+    Project::new(root, &args, conf)
 }
 
-pub fn make_fake_toml() -> String {
+pub fn make_fake_user_config() -> UserConfig {
+    let fake_toml = make_fake_user_toml();
+
+    toml::from_str::<UserConfig>(&fake_toml)
+        .expect("did not make user config from toml")
+}
+
+pub fn make_fake_user_toml() -> String {
+    r#"
+# the paths to the projects
+# {{config-dir}} will correspond to ~/.config/new
+[projects]
+basic_cpp = "{{config-dir}}/projects/basic_cpp.toml"
+basic_javascript = "{{config-dir}}/projects/basic_javascript.toml"
+basic_python = "{{config-dir}}/projects/basic_python.toml"
+
+# alias's to use on the cli
+[alias]
+basic_cpp = ["cpp", "cp", "c++"]
+basic_javascript = ["js", "j"]
+basic_python = ["py", "p"]
+        "#
+    .to_owned()
+}
+
+pub fn make_fake_project_toml() -> String {
     r#"dirs = [
     "src",
     "tests",
