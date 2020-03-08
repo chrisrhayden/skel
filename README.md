@@ -24,20 +24,28 @@ basic_javascript = ["js", "j"]
 ```
 
 all strings will be run through a template
+
 project toml files have a few more slugs
+
 the slugs so far are:
+    ".eslint.json",
     - {{root}} = the root project directory (e.g. /tmp/example_project)
     - {{name}} = the new project name (e.g. cool_cli_tool)
     - {{config-dir}} = the config dir used this instance
 
 example:
-  src = "{{root}}/src" = "/tmp/example_project/src"
-  main = "{{root}}/src/main.js" = "/tmp/example_project/src/main.rs"
+  - src = "{{root}}/src" = "/tmp/example_project/src"
+  - main = "{{root}}/src/main.js" = "/tmp/example_project/src/main.rs"
+
 
 make all directory's listed
+
 this wont fail on already made dirs,
+
 so having the same dirs is fine (e.g. dirs = ["src", "src"])
+
 each dir will correspond to the linux cmd `mkdir -p path/to/dir`
+
 
 ```toml
 # so you could skip `src` if you make `src/foo` (e.g. dirs = ["src/foo"])
