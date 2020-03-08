@@ -1,6 +1,6 @@
 use std::{error::Error, path::PathBuf, process::Command};
 
-use crate::{project::Project, template::template};
+use crate::project::Project;
 
 fn make_bash_string(project: &Project) -> String {
     // if unwind fails here we have other issues
@@ -12,11 +12,7 @@ fn make_bash_string(project: &Project) -> String {
 
     bash_string.insert_str(0, "#!/usr/bin/env bash\n\n");
 
-    let root = project.root_path.to_str().expect("cant get root str");
-
-    let name = &project.name;
-
-    template(root, &name, &bash_string)
+    project.template_str(&bash_string)
 }
 
 fn make_cmd(root: &PathBuf, bash_str: &str) -> Command {
