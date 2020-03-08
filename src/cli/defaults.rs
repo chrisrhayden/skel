@@ -2,12 +2,12 @@ use std::{collections::HashMap, env, error::Error, fs, path::PathBuf};
 
 use serde::Deserialize;
 
-use crate::{collect_project_config, template::template_config, Project};
+use crate::{collect_project_config, template::template, Project};
 
 use super::parse_args::NewArgs;
 
 pub type NewResult<T> = Result<T, Box<dyn Error>>;
-pub type UserResult = NewResult<UserConfig>;
+pub type UserConfigResult = NewResult<UserConfig>;
 
 #[derive(Debug, Deserialize)]
 pub struct UserConfig {
@@ -16,8 +16,8 @@ pub struct UserConfig {
 }
 
 fn find_project_file(
-    user_config: UserConfig,
-    type_str: String,
+    user_config: &UserConfig,
+    type_str: &str,
 ) -> NewResult<String> {
     let type_string = type_str.to_string();
 
@@ -54,15 +54,20 @@ fn find_project_file(
 }
 
 fn project_path_with_templateing(
-    type_str: String,
-    user_config: UserConfig,
-    config_dir: &str,
+    type_str: &str,
+    user_config: &UserConfig,
+    config_dir: &Option<String>,
 ) -> NewResult<PathBuf> {
     let p_string = find_project_file(user_config, type_str)?;
 
-    let p_string = template_config(&config_dir, &p_string);
+    if let Some(config_dir) = config_dir {
+        // this is lame but the only place empty string are used
+        let p_string = template("", "", &config_dir, &p_string);
 
-    Ok(PathBuf::from(p_string))
+        Ok(PathBuf::from(p_string))
+    } else {
+        Ok(PathBuf::from(p_string))
+    }
 }
 
 fn root_string_default_or(root_from_cli: &Option<String>) -> String {
@@ -73,17 +78,17 @@ fn root_string_default_or(root_from_cli: &Option<String>) -> String {
         env::current_dir()
             .expect("cant get current_dir")
             .to_str()
-            .expect("cant convet current dir to string")
+            .expect("cant get str from current dir")
             .to_owned()
     }
 }
 
 // TODO: make the path delimiter and config name variables
 fn config_string_default_or(
-    config_path_from_cli: Option<String>,
-) -> (String, String) {
+    config_path_from_cli: &Option<String>,
+) -> (String, Option<String>) {
     let mut config_dir = match config_path_from_cli {
-        Some(config_path) => config_path.clone(),
+        Some(config_path) => return (config_path.clone(), None),
         None => env::var("HOME").expect("cant get env var HOME"),
     };
 
@@ -98,10 +103,10 @@ fn config_string_default_or(
     config_file.push('/');
     config_file.push_str("config.toml");
 
-    (config_file, config_dir)
+    (config_file, Some(config_dir))
 }
 
-fn make_config_from_toml(config_str: &str) -> UserResult {
+fn make_config_from_toml(config_str: &str) -> UserConfigResult {
     use std::io::Read;
 
     let config_path = PathBuf::from(config_str);
@@ -130,9 +135,9 @@ fn make_config_from_toml(config_str: &str) -> UserResult {
     Ok(toml_conf)
 }
 
-pub fn collect_user_config(
-    config_path: Option<String>,
-) -> NewResult<(UserConfig, String)> {
+fn collect_user_config(
+    config_path: &Option<String>,
+) -> NewResult<(UserConfig, Option<String>)> {
     let (u_s, u_d) = config_string_default_or(config_path);
 
     let conf = make_config_from_toml(&u_s)?;
@@ -143,21 +148,19 @@ pub fn collect_user_config(
 // last takes precedent:
 //      default > config > cli config
 pub fn resolve_default(args: NewArgs) -> NewResult<Project> {
-    let name = args.name;
-
-    let (project_pathbuf, project_dir_str) = match args.cli_project_file {
+    let (project_pathbuf, project_dir_str) = match &args.cli_project_file {
         Some(project_file) => (PathBuf::from(project_file), None),
         None => {
             let (user_config, config_dir_path) =
-                collect_user_config(args.cli_config_path)?;
+                collect_user_config(&args.cli_config_path)?;
 
             (
                 project_path_with_templateing(
-                    args.type_str,
-                    user_config,
+                    &args.type_str,
+                    &user_config,
                     &config_dir_path,
                 )?,
-                Some(config_dir_path),
+                config_dir_path,
             )
         }
     };
@@ -179,7 +182,188 @@ pub fn resolve_default(args: NewArgs) -> NewResult<Project> {
     // or the one given on the cli
     // TODO: make this generic for windows maybe
     root_string.push('/');
-    root_string.push_str(&name);
+    root_string.push_str(&args.name);
 
-    Ok(Project::new(root_string, name, project_config))
+    Ok(Project::new(root_string, &args, project_config))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use crate::test_utils::{make_fake_user_config, TempSetup};
+
+    #[test]
+    fn test_config_string_default_or_default() {
+        let (test_config_path, test_config_dir) =
+            config_string_default_or(&None);
+
+        let mut config_dir = env::var("HOME").expect("HOME not set");
+
+        // first make the directory
+        config_dir.push('/');
+        config_dir.push_str(".config");
+        config_dir.push('/');
+        config_dir.push_str("new");
+
+        // then the actual file
+        let mut config_file = config_dir.clone();
+        config_file.push('/');
+        config_file.push_str("config.toml");
+
+        assert_eq!(
+            test_config_dir,
+            Some(config_dir),
+            "config_string_default_or did not make dir right"
+        );
+
+        assert_eq!(
+            test_config_path, config_file,
+            "did not make config_dir_path right"
+        );
+    }
+
+    #[test]
+    fn test_config_string_default_or_user_provided() {
+        let (test_config_path, test_config_dir) = config_string_default_or(
+            &Some(String::from("/tmp/fake_config.toml")),
+        );
+
+        assert_eq!(
+            test_config_dir, None,
+            "got config dir when there should be one"
+        );
+
+        assert_eq!(
+            test_config_path,
+            String::from("/tmp/fake_config.toml"),
+            "did not make user_config_path right"
+        );
+    }
+
+    #[test]
+    fn test_find_project_file() {
+        let config = make_fake_user_config();
+
+        let project = find_project_file(&config, "cp");
+
+        assert!(project.is_ok(), "failed to find project to make");
+
+        assert_eq!(
+            project.unwrap(),
+            String::from("{{config-dir}}/projects/basic_cpp.toml"),
+            "failed to find project to make"
+        );
+
+        let project = find_project_file(&config, "p");
+
+        assert!(project.is_ok(), "failed to find project to make");
+
+        assert_eq!(
+            project.unwrap(),
+            String::from("{{config-dir}}/projects/basic_python.toml"),
+            "failed to find project to make"
+        );
+
+        let project = find_project_file(&config, "basic_javascript");
+
+        assert!(project.is_ok(), "failed to find project to make");
+
+        assert_eq!(
+            project.unwrap(),
+            String::from("{{config-dir}}/projects/basic_javascript.toml"),
+            "failed to find project to make"
+        );
+    }
+
+    #[test]
+    fn test_project_path_with_templateing() {
+        let fake_config_dir = String::from("/tmp/fake_new");
+
+        let conf = make_fake_user_config();
+
+        let project_path = match project_path_with_templateing(
+            "cp",
+            &conf,
+            &Some(fake_config_dir),
+        ) {
+            Err(err) => {
+                assert!(false, "{}", err);
+                // or just return
+                unreachable!();
+            }
+            Ok(val) => val,
+        };
+
+        assert_eq!(
+            project_path,
+            PathBuf::from("/tmp/fake_new/projects/basic_cpp.toml"),
+            "failed to template path"
+        );
+    }
+
+    #[test]
+    fn test_make_config_from_toml() {
+        let mut temp = TempSetup::default();
+        let root = temp.setup();
+
+        let mut temp_config = root.clone();
+
+        temp_config.push("fake_new");
+        temp_config.push("fake_config.toml");
+
+        temp.make_fake_user_config().expect("cant make user config");
+
+        let user_config = match make_config_from_toml(
+            temp_config.to_str().expect("cant get config path"),
+        ) {
+            Err(err) => {
+                assert!(false, "{}", err);
+                unreachable!();
+            }
+            Ok(val) => val,
+        };
+
+        let mut projects: HashMap<String, String> = HashMap::new();
+
+        projects.insert(
+            String::from("basic_python"),
+            String::from("{{config-dir}}/projects/basic_python.toml"),
+        );
+        projects.insert(
+            String::from("basic_cpp"),
+            String::from("{{config-dir}}/projects/basic_cpp.toml"),
+        );
+        projects.insert(
+            String::from("basic_javascript"),
+            String::from("{{config-dir}}/projects/basic_javascript.toml"),
+        );
+
+        assert_eq!(
+            user_config.projects, projects,
+            "failsed to make user config projects"
+        );
+
+        let mut alias: HashMap<String, Vec<String>> = HashMap::new();
+
+        alias.insert(
+            String::from("basic_cpp"),
+            vec![String::from("cpp"), String::from("cp"), String::from("c++")],
+        );
+
+        alias.insert(
+            String::from("basic_python"),
+            vec![String::from("py"), String::from("p")],
+        );
+
+        alias.insert(
+            String::from("basic_javascript"),
+            vec![String::from("js"), String::from("j")],
+        );
+
+        assert_eq!(
+            user_config.alias, alias,
+            "failed to make user config alias's"
+        );
+    }
 }
