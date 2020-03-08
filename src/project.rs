@@ -296,7 +296,7 @@ impl<'a> Iterator for ProjectTemplateIterator<'a> {
             String::new()
         };
 
-        let path_name = &next_to_template.path;
+        let path_name = self.template(&next_to_template.path);
 
         let mut path_buf = self.root_buf.clone();
 
