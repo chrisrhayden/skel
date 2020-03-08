@@ -15,10 +15,27 @@ use crate::{
 #[derive(Debug, Deserialize)]
 pub struct ProjectConfig {
     pub config_dir_string: Option<String>,
-    pub dirs: Vec<String>,
-    pub files: Vec<String>,
+    pub dirs: Option<Vec<String>>,
+    pub files: Option<Vec<String>>,
     pub build: Option<String>,
     pub templates: Option<Vec<FileTemplate>>,
+    pub all_files: Option<Vec<String>>,
+}
+
+impl ProjectConfig {
+    pub fn resolve_files(&mut self) {
+        let mut all_files = self.files.as_ref().unwrap().clone();
+
+        if let Some(templates) = self.templates.as_ref() {
+            for temp in templates {
+                all_files.push(temp.path.clone());
+            }
+        }
+
+        if !all_files.is_empty() {
+            self.all_files = Some(all_files);
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -46,6 +63,18 @@ pub struct Project {
 
 impl Project {
     pub fn new(root: String, args: &NewArgs, config: ProjectConfig) -> Self {
+        let config_dirs = if let Some(conf_dir) = config.dirs {
+            conf_dir
+        } else {
+            vec![]
+        };
+
+        let files = if let Some(all_files) = config.all_files {
+            all_files
+        } else {
+            vec![]
+        };
+
         Self {
             name: args.name.to_owned(),
             root_path: PathBuf::from(&root),
@@ -53,8 +82,8 @@ impl Project {
             config_dir_string: config
                 .config_dir_string
                 .expect("no config string"),
-            dirs: config.dirs,
-            files: config.files,
+            dirs: config_dirs,
+            files,
             build: config.build,
             templates: config.templates,
             dont_make_template: args.dont_make_templates,
@@ -339,14 +368,12 @@ mod test {
             Err(err) => assert!(false, "{} bad toml config", err),
             Ok(config) => {
                 assert_eq!(
-                    config.dirs[0],
+                    config.dirs.as_ref().unwrap()[0],
                     String::from("src"),
                     "did not get the right name"
                 );
 
-                assert_eq!(config.dirs.is_empty(), false, "config dirs empty");
-
-                for entry in config.dirs {
+                for entry in config.dirs.as_ref().unwrap().iter() {
                     assert_eq!(entry.is_empty(), false, "no dirs in array");
                 }
             }
