@@ -14,28 +14,10 @@ use crate::{
 // a config to deserialize project files in toml
 #[derive(Debug, Deserialize)]
 pub struct ProjectConfig {
-    pub config_dir_string: Option<String>,
     pub dirs: Option<Vec<String>>,
     pub files: Option<Vec<String>>,
     pub build: Option<String>,
     pub templates: Option<Vec<FileTemplate>>,
-    pub all_files: Option<Vec<String>>,
-}
-
-impl ProjectConfig {
-    pub fn resolve_files(&mut self) {
-        let mut all_files = self.files.as_ref().unwrap().clone();
-
-        if let Some(templates) = self.templates.as_ref() {
-            for temp in templates {
-                all_files.push(temp.path.clone());
-            }
-        }
-
-        if !all_files.is_empty() {
-            self.all_files = Some(all_files);
-        }
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -62,14 +44,23 @@ pub struct Project {
 }
 
 impl Project {
-    pub fn new(root: String, args: &SkelArgs, config: ProjectConfig) -> Self {
+    pub fn new(
+        root: String,
+        config_dir_string: String,
+        args: &SkelArgs,
+        config: ProjectConfig,
+    ) -> Self {
         let config_dirs = if let Some(conf_dir) = config.dirs {
             conf_dir
         } else {
             vec![]
         };
 
-        let files = if let Some(all_files) = config.all_files {
+        let files = if let Some(mut all_files) = config.files {
+            for temp in config.templates.as_ref().unwrap().iter() {
+                all_files.push(temp.path.clone());
+            }
+
             all_files
         } else {
             vec![]
@@ -79,9 +70,7 @@ impl Project {
             name: args.name.to_owned(),
             root_path: PathBuf::from(&root),
             root_string: root,
-            config_dir_string: config
-                .config_dir_string
-                .expect("no config string"),
+            config_dir_string,
             dirs: config_dirs,
             files,
             build: config.build,
@@ -383,6 +372,7 @@ mod test {
     #[test]
     fn test_new_project() {
         let config = make_fake_project_config();
+        let config_dir = String::from("/tmp/fake_config/config.toml");
 
         let root = String::from("/tmp/test_path");
 
@@ -390,7 +380,7 @@ mod test {
 
         let args = SkelArgs::make_fake(&name, "fake_type");
 
-        let project = Project::new(root, &args, config);
+        let project = Project::new(root, config_dir, &args, config);
 
         assert_eq!(project.name, "test_project");
 
