@@ -7,7 +7,9 @@ use std::{
 use serde::Deserialize;
 use toml;
 
-use crate::{fs_tools::collect_string_from_file, template::template};
+use crate::{
+    cli::NewArgs, fs_tools::collect_string_from_file, template::template,
+};
 
 // a config to deserialize project files in toml
 #[derive(Debug, Deserialize)]
@@ -38,12 +40,14 @@ pub struct Project {
     pub files: Vec<String>,
     pub build: Option<String>,
     pub templates: Option<Vec<FileTemplate>>,
+    pub make_template: bool,
+    pub run_build: bool,
 }
 
 impl Project {
-    pub fn new(root: String, name: String, config: ProjectConfig) -> Self {
+    pub fn new(root: String, args: &NewArgs, config: ProjectConfig) -> Self {
         Self {
-            name,
+            name: args.name.to_owned(),
             root_path: PathBuf::from(&root),
             root_string: root,
             config_dir_string: config
@@ -53,7 +57,18 @@ impl Project {
             files: config.files,
             build: config.build,
             templates: config.templates,
+            make_template: args.make_templates,
+            run_build: args.run_build,
         }
+    }
+
+    pub fn template_str(&self, to_template: &str) -> String {
+        template(
+            &self.root_string,
+            &self.name,
+            &self.config_dir_string,
+            to_template,
+        )
     }
 
     pub fn resolve_templates(&mut self) -> Result<(), Box<dyn Error>> {
@@ -70,6 +85,7 @@ impl Project {
                 let include_path = PathBuf::from(template(
                     &self.config_dir_string,
                     &self.name,
+                    &self.config_dir_string,
                     include_str,
                 ));
 
@@ -104,22 +120,35 @@ impl Project {
     pub fn dir_iter(&self) -> ProjectPathIterator {
         let root = self.root_path.to_str().expect("cant covert path to str");
 
-        ProjectPathIterator::new(root, &self.name, &self.dirs)
+        ProjectPathIterator::new(
+            root,
+            &self.name,
+            &self.config_dir_string,
+            &self.dirs,
+        )
     }
 
     pub fn file_iter(&self) -> ProjectPathIterator {
         let root = self.root_path.to_str().expect("cant covert path to str");
 
-        ProjectPathIterator::new(root, &self.name, &self.files)
+        ProjectPathIterator::new(
+            root,
+            &self.name,
+            &self.config_dir_string,
+            &self.files,
+        )
     }
 
     pub fn template_iter(&self) -> Option<ProjectTemplateIterator> {
         let root = self.root_path.to_str().expect("cant covert path to str");
 
         match &self.templates {
-            Some(templates) => {
-                Some(ProjectTemplateIterator::new(root, &self.name, &templates))
-            }
+            Some(templates) => Some(ProjectTemplateIterator::new(
+                root,
+                &self.name,
+                &self.config_dir_string,
+                &templates,
+            )),
             None => None,
         }
     }
@@ -134,13 +163,20 @@ pub struct ProjectPathIterator<'a> {
     root: &'a str,
     root_buf: PathBuf,
     name: &'a str,
+    conf: &'a str,
     array: &'a [String],
 }
 
 impl<'a> ProjectPathIterator<'a> {
-    pub fn new(root: &'a str, name: &'a str, array: &'a [String]) -> Self {
+    pub fn new(
+        root: &'a str,
+        name: &'a str,
+        conf: &'a str,
+        array: &'a [String],
+    ) -> Self {
         Self {
             root,
+            conf,
             root_buf: PathBuf::from(root),
             name,
             curr: 0,
@@ -150,7 +186,7 @@ impl<'a> ProjectPathIterator<'a> {
     }
 
     fn template(&self, source: &str) -> String {
-        template(self.root, self.name, source)
+        template(self.root, self.name, self.conf, source)
     }
 }
 
@@ -181,6 +217,7 @@ pub struct ProjectTemplateIterator<'a> {
     root_buf: PathBuf,
     root: &'a str,
     name: &'a str,
+    conf: &'a str,
     array: &'a [FileTemplate],
     max_len: usize,
     curr: usize,
@@ -190,12 +227,14 @@ impl<'a> ProjectTemplateIterator<'a> {
     pub fn new(
         root: &'a str,
         name: &'a str,
+        conf: &'a str,
         array: &'a [FileTemplate],
     ) -> Self {
         Self {
             root,
             root_buf: PathBuf::from(root),
             name,
+            conf,
             curr: 0,
             max_len: array.len(),
             array,
@@ -203,7 +242,7 @@ impl<'a> ProjectTemplateIterator<'a> {
     }
 
     fn template(&self, to_temp: &str) -> String {
-        template(self.root, self.name, to_temp)
+        template(self.root, self.name, self.conf, to_temp)
     }
 }
 
@@ -267,13 +306,14 @@ mod test {
     use super::*;
 
     use crate::test_utils::{
-        make_fake_config, make_fake_project, make_fake_toml, TempSetup,
+        make_fake_project, make_fake_project_config, make_fake_project_toml,
+        TempSetup,
     };
 
     fn make_fake_conifg_file(root: &Path) -> bool {
         use std::io::Write;
 
-        let toml_str = make_fake_toml();
+        let toml_str = make_fake_project_toml();
         let mut fake_conf =
             fs::File::create(root).expect("cant make file in temp");
 
@@ -315,13 +355,15 @@ mod test {
 
     #[test]
     fn test_new_project() {
-        let config = make_fake_config();
+        let config = make_fake_project_config();
 
         let root = String::from("/tmp/test_path");
 
         let name = String::from("test_project");
 
-        let project = Project::new(root, name, config);
+        let args = NewArgs::make_fake(&name, "fake_type");
+
+        let project = Project::new(root, &args, config);
 
         assert_eq!(project.name, "test_project");
 
@@ -397,19 +439,7 @@ mod test {
 
     #[test]
     fn test_config_template_iter() {
-        let toml_config_string = make_fake_toml();
-
-        let toml_config = toml::from_str::<ProjectConfig>(&toml_config_string)
-            .expect("cant use fake toml file");
-
-        let mut root = String::from("/tmp/test_root");
-
-        let name = String::from("test_project");
-
-        root.push('/');
-        root.push_str(&name);
-
-        let proj = Project::new(root, name, toml_config);
+        let proj = make_fake_project(None);
 
         let mut template_iter =
             proj.template_iter().expect("cant get template iter");
