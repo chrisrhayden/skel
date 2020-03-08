@@ -2,8 +2,8 @@
 
 pub mod cli;
 mod fs_tools;
-mod new_rs_error;
 mod project;
+mod skel_error;
 mod system_tools;
 mod template;
 mod test_utils;

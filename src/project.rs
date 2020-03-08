@@ -8,7 +8,7 @@ use serde::Deserialize;
 use toml;
 
 use crate::{
-    cli::NewArgs, fs_tools::collect_string_from_file, template::template,
+    cli::SkelArgs, fs_tools::collect_string_from_file, template::template,
 };
 
 // a config to deserialize project files in toml
@@ -62,7 +62,7 @@ pub struct Project {
 }
 
 impl Project {
-    pub fn new(root: String, args: &NewArgs, config: ProjectConfig) -> Self {
+    pub fn new(root: String, args: &SkelArgs, config: ProjectConfig) -> Self {
         let config_dirs = if let Some(conf_dir) = config.dirs {
             conf_dir
         } else {
@@ -388,7 +388,7 @@ mod test {
 
         let name = String::from("test_project");
 
-        let args = NewArgs::make_fake(&name, "fake_type");
+        let args = SkelArgs::make_fake(&name, "fake_type");
 
         let project = Project::new(root, &args, config);
 

@@ -4,7 +4,7 @@ use clap::{App, Arg, ArgMatches};
 
 // TODO: consider using the &str's form clap instead of new strings
 #[derive(Default, Debug)]
-pub struct NewArgs {
+pub struct SkelArgs {
     pub name: String,
     pub type_str: String,
     pub different_root: Option<String>,
@@ -14,7 +14,7 @@ pub struct NewArgs {
     pub dont_make_templates: bool,
 }
 
-impl NewArgs {
+impl SkelArgs {
     pub fn make_fake(name: &str, type_str: &str) -> Self {
         Self {
             name: name.to_owned(),
@@ -29,7 +29,7 @@ impl NewArgs {
 }
 
 fn get_arg_matches() -> ArgMatches {
-    App::new("new -- a project maker")
+    App::new("skel -- a project maker")
         .about("make a project from a toml file")
         .arg(
             Arg::with_name("TYPE")
@@ -81,7 +81,7 @@ fn get_arg_matches() -> ArgMatches {
         .get_matches()
 }
 
-pub fn parse_args() -> Result<NewArgs, Box<dyn Error>> {
+pub fn parse_args() -> Result<SkelArgs, Box<dyn Error>> {
     let matches = get_arg_matches();
 
     let project_type = matches.value_of("TYPE");
@@ -100,10 +100,10 @@ pub fn parse_args() -> Result<NewArgs, Box<dyn Error>> {
         return Err(Box::from(String::from("to few args given")));
     }
 
-    let mut new_args = NewArgs::default();
+    let mut skel_args = SkelArgs::default();
 
     if project_type.is_some() && project_file.is_none() {
-        new_args.type_str = project_type
+        skel_args.type_str = project_type
             .map(String::from)
             .expect("cant unwrap project type");
     } else {
@@ -111,22 +111,22 @@ pub fn parse_args() -> Result<NewArgs, Box<dyn Error>> {
     };
 
     if name.is_none() && project_type.is_some() {
-        new_args.name = project_type
+        skel_args.name = project_type
             .map(String::from)
             .expect("cant unwrap project type");
     } else if name.is_some() {
-        new_args.name =
+        skel_args.name =
             name.map(String::from).expect("cant unwrap project type");
     } else {
         return Err(Box::from(String::from("bad args or bad parsing of args")));
     };
 
-    new_args.different_root = root.map(String::from);
-    new_args.cli_project_file = project_file.map(String::from);
-    new_args.cli_config_path = config_path.map(String::from);
+    skel_args.different_root = root.map(String::from);
+    skel_args.cli_project_file = project_file.map(String::from);
+    skel_args.cli_config_path = config_path.map(String::from);
 
-    new_args.dont_make_templates = matches.is_present("no templating");
-    new_args.dont_run_build = matches.is_present("no build");
+    skel_args.dont_make_templates = matches.is_present("no templating");
+    skel_args.dont_run_build = matches.is_present("no build");
 
-    Ok(new_args)
+    Ok(skel_args)
 }

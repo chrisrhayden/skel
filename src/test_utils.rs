@@ -6,7 +6,7 @@ use tempfile::{tempdir, TempDir};
 use toml;
 
 use crate::{
-    cli::{NewArgs, UserConfig},
+    cli::{SkelArgs, UserConfig},
     project::{Project, ProjectConfig},
 };
 
@@ -101,7 +101,7 @@ impl TempSetup {
 
         let mut fake_config = self.root_buf();
 
-        fake_config.push("fake_new");
+        fake_config.push("fake_skel");
 
         fs::create_dir_all(&fake_config).expect("cant make config dir");
 
@@ -166,7 +166,7 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
     root.push('/');
     root.push_str(&name);
 
-    let args = NewArgs::make_fake(&name, "fake_type");
+    let args = SkelArgs::make_fake(&name, "fake_type");
 
     Project::new(root, &args, conf)
 }
@@ -181,7 +181,7 @@ pub fn make_fake_user_config() -> UserConfig {
 pub fn make_fake_user_toml() -> String {
     r#"
 # the paths to the projects
-# {{config-dir}} will correspond to ~/.config/new
+# {{config-dir}} will correspond to ~/.config/skel
 [projects]
 basic_cpp = "{{config-dir}}/projects/basic_cpp.toml"
 basic_javascript = "{{config-dir}}/projects/basic_javascript.toml"

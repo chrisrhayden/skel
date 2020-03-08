@@ -1,5 +1,5 @@
 # the paths to the projects
-# {{config-dir}} will correspond to ~/.config/new
+# {{config-dir}} will correspond to ~/.config/skel
 [projects]
 basic_cpp = "{{config-dir}}/projects/cpp.toml"
 basic_javascript = "{{config-dir}}/projects/javascript.toml"

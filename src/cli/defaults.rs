@@ -4,10 +4,10 @@ use serde::Deserialize;
 
 use crate::{collect_project_config, template::template, Project};
 
-use super::parse_args::NewArgs;
+use super::parse_args::SkelArgs;
 
-pub type NewResult<T> = Result<T, Box<dyn Error>>;
-pub type UserConfigResult = NewResult<UserConfig>;
+pub type SkelResult<T> = Result<T, Box<dyn Error>>;
+pub type UserConfigResult = SkelResult<UserConfig>;
 
 #[derive(Debug, Deserialize)]
 pub struct UserConfig {
@@ -18,7 +18,7 @@ pub struct UserConfig {
 fn find_project_file(
     user_config: &UserConfig,
     type_str: &str,
-) -> NewResult<String> {
+) -> SkelResult<String> {
     let type_string = type_str.to_string();
 
     if let Some(path_string) = user_config.projects.get(&type_string) {
@@ -57,7 +57,7 @@ fn project_path_with_templateing(
     type_str: &str,
     user_config: &UserConfig,
     config_dir: &Option<String>,
-) -> NewResult<PathBuf> {
+) -> SkelResult<PathBuf> {
     let p_string = find_project_file(user_config, type_str)?;
 
     if let Some(config_dir) = config_dir {
@@ -96,7 +96,7 @@ fn config_string_default_or(
     config_dir.push('/');
     config_dir.push_str(".config");
     config_dir.push('/');
-    config_dir.push_str("new");
+    config_dir.push_str("skel");
 
     // then the actual file
     let mut config_file = config_dir.clone();
@@ -137,7 +137,7 @@ fn make_config_from_toml(config_str: &str) -> UserConfigResult {
 
 fn collect_user_config(
     config_path: &Option<String>,
-) -> NewResult<(UserConfig, Option<String>)> {
+) -> SkelResult<(UserConfig, Option<String>)> {
     let (u_s, u_d) = config_string_default_or(config_path);
 
     let conf = make_config_from_toml(&u_s)?;
@@ -147,7 +147,7 @@ fn collect_user_config(
 
 // last takes precedent:
 //      default > config > cli config
-pub fn resolve_default(args: NewArgs) -> NewResult<Project> {
+pub fn resolve_default(args: SkelArgs) -> SkelResult<Project> {
     let (project_pathbuf, project_dir_str) = match &args.cli_project_file {
         Some(project_file) => (PathBuf::from(project_file), None),
         None => {
@@ -206,7 +206,7 @@ mod test {
         config_dir.push('/');
         config_dir.push_str(".config");
         config_dir.push('/');
-        config_dir.push_str("new");
+        config_dir.push_str("skel");
 
         // then the actual file
         let mut config_file = config_dir.clone();
@@ -280,7 +280,7 @@ mod test {
 
     #[test]
     fn test_project_path_with_templateing() {
-        let fake_config_dir = String::from("/tmp/fake_new");
+        let fake_config_dir = String::from("/tmp/fake_skel");
 
         let conf = make_fake_user_config();
 
@@ -299,7 +299,7 @@ mod test {
 
         assert_eq!(
             project_path,
-            PathBuf::from("/tmp/fake_new/projects/basic_cpp.toml"),
+            PathBuf::from("/tmp/fake_skel/projects/basic_cpp.toml"),
             "failed to template path"
         );
     }
@@ -311,7 +311,7 @@ mod test {
 
         let mut temp_config = root.clone();
 
-        temp_config.push("fake_new");
+        temp_config.push("fake_skel");
         temp_config.push("fake_config.toml");
 
         temp.make_fake_user_config().expect("cant make user config");

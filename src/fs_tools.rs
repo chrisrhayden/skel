@@ -10,8 +10,8 @@ use std::{
 };
 
 use crate::{
-    new_rs_error::{NewInnerErrType, NewInnerError},
     project::Project,
+    skel_error::{SkelErrType, SkelError},
 };
 
 pub fn collect_string_from_file<P>(path: P) -> Result<String, Box<dyn Error>>
@@ -86,24 +86,24 @@ fn make_project_templates(project: &Project) -> Result<(), Box<dyn Error>> {
 ///!     - file templates (echo "$template" > path/to/file)
 ///! these functions works like unix's mkdir or touch
 ///! templates are another story
-pub fn make_project_tree(project: &Project) -> Result<(), NewInnerError> {
+pub fn make_project_tree(project: &Project) -> Result<(), SkelError> {
     // check if something exists at root, root being /path/to/project_name
     if project.root_path.exists() {
         let root_string = project.root_string();
 
-        let err_type = NewInnerErrType::ProjectExists;
+        let err_type = SkelErrType::ProjectExists;
 
-        return Err(NewInnerError::new(err_type, root_string));
+        return Err(SkelError::new(err_type, root_string));
     }
 
-    make_project_dirs(project).map_err(NewInnerError::from_io_err)?;
+    make_project_dirs(project).map_err(SkelError::from_io_err)?;
 
-    make_project_files(project).map_err(NewInnerError::from_io_err)?;
+    make_project_files(project).map_err(SkelError::from_io_err)?;
 
     if project.dont_make_template {
         Ok(())
     } else {
-        make_project_templates(project).map_err(NewInnerError::from_io_err)
+        make_project_templates(project).map_err(SkelError::from_io_err)
     }
 }
 
@@ -197,8 +197,8 @@ mod test {
 
         if let Err(err) = make_project_tree(&proj) {
             match err.kind() {
-                NewInnerErrType::ProjectExists => assert!(true),
-                NewInnerErrType::IoError => {
+                SkelErrType::ProjectExists => assert!(true),
+                SkelErrType::IoError => {
                     eprintln!("{}", err);
                     assert!(false, "io err");
                 }

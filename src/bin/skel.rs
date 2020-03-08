@@ -1,7 +1,7 @@
 ///! just a wrapper around the lib interface and the cli interface
 use std::error::Error;
 
-use new_rs::{
+use skel::{
     cli::{parse_args, resolve_default},
     make_project,
 };
