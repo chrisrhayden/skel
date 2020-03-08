@@ -10,8 +10,8 @@ pub struct NewArgs {
     pub different_root: Option<String>,
     pub cli_config_path: Option<String>,
     pub cli_project_file: Option<String>,
-    pub run_build: bool,
-    pub make_templates: bool,
+    pub dont_run_build: bool,
+    pub dont_make_templates: bool,
 }
 
 impl NewArgs {
@@ -22,8 +22,8 @@ impl NewArgs {
             different_root: None,
             cli_config_path: None,
             cli_project_file: None,
-            run_build: true,
-            make_templates: true,
+            dont_run_build: true,
+            dont_make_templates: true,
         }
     }
 }
@@ -123,6 +123,9 @@ pub fn parse_args() -> Result<NewArgs, Box<dyn Error>> {
     new_args.different_root = root.map(String::from);
     new_args.cli_project_file = project_file.map(String::from);
     new_args.cli_config_path = config_path.map(String::from);
+
+    new_args.dont_make_templates = matches.is_present("no-templates");
+    new_args.dont_run_build = matches.is_present("no-build");
 
     Ok(new_args)
 }
