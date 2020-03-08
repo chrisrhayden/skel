@@ -157,7 +157,9 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
         String::from("/tmp/test_root")
     };
 
-    let conf = make_fake_project_config();
+    let mut conf = make_fake_project_config();
+
+    conf.resolve_files();
 
     let name = String::from("test_project");
 
