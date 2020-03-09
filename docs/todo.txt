@@ -1,10 +1,12 @@
 short term:
-- check if paths are relative or absolute
+- check if paths are relative or absolute and to not add / to the name if added
 - add a way to not run build script or templates
 - use a templating library
 
 long term:
 - make errors better
+- add a way to include a script to build or maybe a build method
+  like makepkgs
 
 test:
 - make test for optional config variables
