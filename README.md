@@ -3,52 +3,81 @@
 make a project layout from a toml file
 
 ## Getting started
-skel takes a project type and a name and will make the project in to that name
+
+### basics
+skel takes a project type and a name and will make the corresponding project in to that name
 ```bash
-skel cp name
+skel javascript project_name
 ```
 
-the user config is located at ~/.config/skel/config.toml
-you can template the paths
-an example config
+skel can also use alias's like so
+```bash
+skel js name
 
-```toml
-# the paths to the projects
-# {{config-dir}} will correspond to ~/.config/skel
-[projects]
-basic_javascript = "{{config-dir}}/projects/javascript.toml"
-
-# alias's to use on the cli
-[alias]
-basic_javascript = ["js", "j"]
+skel j name
 ```
 
-all strings will be run through a template
+skel ether needs a global config pointing to project files (also called a skeletons), or a single project file. see [config](#config) for more.
 
-project toml files have a few more slugs
+### help
+```
+skel -- a project maker 
+make a project from a toml file
+
+USAGE:
+    skel [FLAGS] [OPTIONS] [ARGS]
+
+ARGS:
+    <TYPE>    a project type or alias to make
+    <NAME>    the name of the project to make
+
+FLAGS:
+    -h, --help             Prints help information
+    -n, --no-build         dont run the build script
+    -N, --no-templating    dont make templates
+    -V, --version          Prints version information
+
+OPTIONS:
+    -c, --different-config <FILE>    use FILE instead of the default config file
+    -r, --different-root <PATH>      use PATH as root inserted of current dir
+    -p, --project-file <FILE>        a project file to use instead of looking one up
+
+```
+
+### config
+
+
+skel can use a global config that points to project skeletons. these skeletons are toml files that have a few options like `files` and `dirs` to make as well as a `build` script that will be run with bash and a series of `templates` to add text. all strings including template files will be run through the template.
 
 the slugs so far are:
-    ".eslint.json",
-    - {{root}} = the root project directory (e.g. /tmp/example_project)
-    - {{name}} = the new project name (e.g. cool_cli_tool)
-    - {{config-dir}} = the config dir used this instance
+  - {{root}} = the root project directory (e.g. /tmp/example_project)
+  - {{name}} = the new project name (e.g. cool_cli_tool)
+  - {{config-dir}} = the config dir used this instance
 
 example:
-  - src = "{{root}}/src" = "/tmp/example_project/src"
-  - main = "{{root}}/src/main.js" = "/tmp/example_project/src/main.rs"
+  - "{{root}}/src" = "/tmp/example_project/src"
+  - "{{root}}/{{name}}/main.py" = "/tmp/example_project/example_project/main.py"
 
 
-make all directory's listed
+<br>
+directory's and files will be made like you are using `mkdir -p` or `touch`
 
-this wont fail on already made dirs,
+the `build` script will have `#!/usr/bin/env bash\n\n` appended to the top of the string
 
-so having the same dirs is fine (e.g. dirs = ["src", "src"])
+other then templating the `templates` (heh) will act like you ran
 
-each dir will correspond to the linux cmd `mkdir -p path/to/dir`
+```bash
+cat path/to/main.js > /tmp/example_project/src/main.js
+```
 
+
+<br>
+an example config file looks like
 
 ```toml
-# so you could skip `src` if you make `src/foo` (e.g. dirs = ["src/foo"])
+# ~/.config/skel/projects/javascript.toml
+
+# you could skip `src` if you make `src/foo` (e.g. dirs = ["src/foo"])
 dirs = [
     "src",
     "src/foo"
@@ -66,7 +95,6 @@ files = [
 # unless no files are to be made the script will be run in the project root
 # if only the build variable is present the script will be run from the calling
 # directory
-# `#!/usr/bin/env bash` will be added, probably a bad idea
 build = """
 # init the project
 echo "$PWD"
@@ -77,8 +105,8 @@ if [[ -f {{root}}/package.json ]]; then
 fi
 """
 
-# basic templates to be made, the same slugs apply
-# these are added to the files to be made no mater what
+# the list of templates to be made
+# these are added to the files list at runtime unless the --no-templating flag is present
 [[templates]]
 path = "src/main.js"
 template = """function run() {
@@ -95,12 +123,38 @@ main();
 module.run = run;
 """
 
-# you can also include another file by giving it a name, you can also template
-# the include path the template variable will be overridden by the include
-# variable but one is needed
+# you can also include another file by using the include variable,
+# the template variable will be overridden by include but at least one is needed
 [[templates]]
 path  = ".eslint.json"
-# use a file a ~/.config/skel/projects/javascript.eslint
-# instead of a template string
 include = "{{config-dir}}/projects/basic_javascript/javascript.eslint"
+```
+
+you can call this file like
+
+```bash
+skel -p ~/.config/skel/projects/javascript.toml project_name
+```
+
+
+but skel can use a global config file that points to the project skeleton and defines  aliases to be use on th cli, the user config is located at `~/.config/skel/config.toml`
+
+
+the config only has two options, `projects` and `aliases`. projects takes a key value pairs of a project skeleton names and a path to that skeleton. aliases takes a project name and a list of values to associate and become aliases for that project skeleton
+
+an example config looks like
+
+```toml
+# the paths to the projects
+# {{config-dir}} will correspond to ~/.config/skel
+[projects]
+basic_javascript = "{{config-dir}}/projects/javascript.toml"
+# the name or path dose not matter
+tmp_python = "/path/to/python_project/python.toml"
+
+# alias's to use on the cli
+[aliases]
+basic_javascript = ["js", "j"]
+# these can be anything
+tmp_python = ["py", "p", "this_is_not_shorter"]
 ```

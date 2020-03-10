@@ -4,6 +4,7 @@ short term:
 - use a templating library
 
 long term:
+- remove template file if not making templates
 - make errors better
 - add a way to include a script to build or maybe a build method
   like makepkgs
