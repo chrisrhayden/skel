@@ -6,8 +6,17 @@ make a project layout from a toml file
 
 ### basics
 skel takes a project type and a name and will make the corresponding project in to that name
+
 ```bash
 skel javascript project_name
+
+tree project_name
+#  project_name/
+#  ├── node_modules [116 entries exceeds filelimit, not opening dir]
+#  ├── package.json
+#  ├── src
+#  │   └── main.js
+#  └── yarn.lock
 ```
 
 skel can also use alias's like so
@@ -21,7 +30,7 @@ skel ether needs a global config pointing to project files (also called a skelet
 
 ### help
 ```
-skel -- a project maker 
+skel -- a project maker
 make a project from a toml file
 
 USAGE:
@@ -47,9 +56,26 @@ OPTIONS:
 ### config
 
 
-skel can use a global config that points to project skeletons. these skeletons are toml files that have a few options like `files` and `dirs` to make as well as a `build` script that will be run with bash and a series of `templates` to add text. all strings including template files will be run through the template.
+skel needs at least a skeleton project to make (or whats the point). these skeletons are toml files that have a few options like `files` and `dirs` to make as well as a `build` script that will be run with bash and a series of `templates` to add text. all strings including template files will be run through the template.
 
-the slugs so far are:
+directory's and files will be made like you are using `mkdir -p` or `touch`
+
+the `build` script will have `#!/usr/bin/env bash\n\n` appended to the top of the string
+
+other then templating the `templates` (heh) will act like you ran
+```bash
+cat path/to/main.js > /tmp/example_project/src/main.js
+```
+
+
+the variables:
+  - dirs = the directory's to make
+  - files = blank files to make
+  - build = a string that becomes a build script
+  - templates = a path to make in to
+    and ether a string or an included file to fill the given path
+
+the slugs so far:
   - {{root}} = the root project directory (e.g. /tmp/example_project)
   - {{name}} = the new project name (e.g. cool_cli_tool)
   - {{config-dir}} = the config dir used this instance
@@ -57,18 +83,6 @@ the slugs so far are:
 example:
   - "{{root}}/src" = "/tmp/example_project/src"
   - "{{root}}/{{name}}/main.py" = "/tmp/example_project/example_project/main.py"
-
-
-<br>
-directory's and files will be made like you are using `mkdir -p` or `touch`
-
-the `build` script will have `#!/usr/bin/env bash\n\n` appended to the top of the string
-
-other then templating the `templates` (heh) will act like you ran
-
-```bash
-cat path/to/main.js > /tmp/example_project/src/main.js
-```
 
 
 <br>
@@ -133,11 +147,11 @@ include = "{{config-dir}}/projects/basic_javascript/javascript.eslint"
 you can call this file like
 
 ```bash
-skel -p ~/.config/skel/projects/javascript.toml project_name
+skel --project-file ~/.config/skel/projects/javascript.toml project_name
 ```
 
 
-but skel can use a global config file that points to the project skeleton and defines  aliases to be use on th cli, the user config is located at `~/.config/skel/config.toml`
+but skel can use a global config file that points to the project skeleton and defines  aliases to be use on the cli, the user config is located at `~/.config/skel/config.toml`
 
 
 the config only has two options, `projects` and `aliases`. projects takes a key value pairs of a project skeleton names and a path to that skeleton. aliases takes a project name and a list of values to associate and become aliases for that project skeleton
