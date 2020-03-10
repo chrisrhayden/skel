@@ -62,7 +62,7 @@ directory's and files will be made like you are using `mkdir -p` or `touch`
 
 the `build` script will have `#!/usr/bin/env bash\n\n` appended to the top of the string
 
-other then templating the `templates` (heh) will act like you ran
+other then templating the `templates` they (heh) will act like you ran
 ```bash
 cat path/to/main.js > /tmp/example_project/src/main.js
 ```
@@ -72,8 +72,8 @@ the variables:
   - dirs = the directory's to make
   - files = blank files to make
   - build = a string that becomes a build script
-  - templates = a path to make in to
-    and ether a string or an included file to fill the given path
+  - templates = a `path` to make in to
+    and ether a `template` string or an `include` file to fill the given path
 
 the slugs so far:
   - {{root}} = the root project directory (e.g. /tmp/example_project)
@@ -164,11 +164,11 @@ an example config looks like
 [projects]
 basic_javascript = "{{config-dir}}/projects/javascript.toml"
 # the name or path dose not matter
-tmp_python = "/path/to/python_project/python.toml"
+new_python = "/path/to/python_project/python.toml"
 
 # alias's to use on the cli
 [aliases]
 basic_javascript = ["js", "j"]
 # these can be anything
-tmp_python = ["py", "p", "this_is_not_shorter"]
+new_python = ["py", "p", "this_is_not_shorter"]
 ```
