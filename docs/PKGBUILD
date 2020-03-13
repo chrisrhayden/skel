@@ -20,7 +20,7 @@ package() {
       "${srcdir}/${pkgname%-git}/target/release/${pkgname%-git}" \
       "${pkgdir}/usr/bin/${pkgname%-git}"
 
-    install -D -o root -g root -m 644 "${srcdir}/${pkgname%-git}/docs/_zsh" \
-        "${pkgdir}/usr/share/zsh/site-functions/_zsh"
+    install -D -o root -g root -m 644 "${srcdir}/${pkgname%-git}/docs/_${pkgname}" \
+        "${pkgdir}/usr/share/zsh/site-functions/_${pkgname}"
 }
 
