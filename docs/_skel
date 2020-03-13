@@ -1,0 +1,34 @@
+#compdef skel
+
+local -a subcmd
+
+subcmd=(
+    {-n,--no-build}'[dont run the build script]'
+    {-N,--no-templating}'[dont make templates]'
+    {-V,--version}'[prints version information]'
+    {-c,--different-config}'[use a different config file]'
+    {-r,--different-root}'[use a different root path]'
+    {-p,--project-file}'[specify a project file to use]'
+)
+
+
+_projects() {
+    local project_names
+
+    project_names="$(grep -oP '^\w+\w(?!\\s+=.*)' ~/.config/skel/config.toml)"
+
+
+    projects=()
+
+    while IFS= read -r line; do
+        projects+=( $line )
+        # project_names+=( $(printf '%s' "$line" ))
+    done <<< "$(printf '%s %s' "$project_names" "$project_alias")"
+
+    _values 'projects' ${projects[@]}
+}
+
+_arguments ${subcmd[@]}
+_projects
+
+# vim: filetype=zsh

@@ -8,6 +8,7 @@ long term:
 - make errors better
 - add a way to include a script to build or maybe a build method
   like makepkgs
+- make auto complete better
 
 test:
 - make test for optional config variables
