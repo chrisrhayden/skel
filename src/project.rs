@@ -83,7 +83,7 @@ pub struct Project {
     pub dirs: Option<Vec<String>>,
     pub files: Option<Vec<String>>,
     pub build: Option<String>,
-    pub templates: Option<Vec<FileTemplate>>,
+    pub templates: Option<Vec<ProjectTemplate>>,
     pub root_path: PathBuf,
     // these are for template slugs
     pub root_string: String,
@@ -134,7 +134,7 @@ impl Project {
                 root,
                 &self.name,
                 &self.config_dir_string,
-                dirs,
+                dirs.iter().map(|ele| ele.as_str()).collect::<Vec<&str>>(),
             ))
         } else {
             None

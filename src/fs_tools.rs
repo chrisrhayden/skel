@@ -38,7 +38,7 @@ where
     Ok(buf)
 }
 
-fn make_project_dirs(project: &mut Project) -> Result<(), Box<dyn Error>> {
+fn make_project_dirs(project: &Project) -> Result<(), Box<dyn Error>> {
     if let Some(dir_iter) = project.dir_iter() {
         for dir in dir_iter {
             fs::create_dir_all(dir)?;
