@@ -96,14 +96,14 @@ pub struct Project {
 impl Project {
     pub fn new(project_args: ProjectArgs) -> Self {
         Self {
-            files: project_args.files.clone(),
+            files: project_args.files,
             dirs: project_args.dirs,
-            name: project_args.args.name.to_owned(),
+            name: project_args.args.name,
             root_path: PathBuf::from(&project_args.root),
             root_string: project_args.root,
             config_dir_string: project_args.config_dir_string,
             build: project_args.build,
-            templates: project_args.templates.clone(),
+            templates: project_args.templates,
             dont_make_template: project_args.args.dont_make_templates,
             dont_run_build: project_args.args.dont_run_build,
         }
