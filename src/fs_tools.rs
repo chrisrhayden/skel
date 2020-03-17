@@ -39,16 +39,20 @@ where
 }
 
 fn make_project_dirs(project: &Project) -> Result<(), Box<dyn Error>> {
-    for dir in project.dir_iter() {
-        fs::create_dir_all(dir)?;
+    if let Some(dir_iter) = project.dir_iter() {
+        for dir in dir_iter {
+            fs::create_dir_all(dir)?;
+        }
     }
 
     Ok(())
 }
 
 fn make_project_files(project: &Project) -> Result<(), Box<dyn Error>> {
-    for file in project.file_iter() {
-        fs::File::create(file)?;
+    if let Some(file_iter) = project.file_iter() {
+        for file in file_iter {
+            fs::File::create(file)?;
+        }
     }
 
     Ok(())
@@ -128,7 +132,7 @@ mod test {
 
         // the make_project_dirs should not fail on making the same dir twice
         // add src again to test making twice
-        proj.dirs.push(String::from("src"));
+        proj.dirs.as_mut().unwrap().push(String::from("src"));
 
         if let Err(err) = make_project_dirs(&proj) {
             eprintln!("{}", err);
@@ -138,7 +142,7 @@ mod test {
 
         assert!(src.exists(), "didn't make the root src");
 
-        for d in proj.dir_iter() {
+        for d in proj.dir_iter().unwrap() {
             assert!(d.exists(), "{:?} -- dir dose not exists", d);
         }
 
@@ -174,7 +178,7 @@ mod test {
 
         assert!(main_f.exists(), "failed to make src/main.rs");
 
-        for f in proj.file_iter() {
+        for f in proj.file_iter().unwrap() {
             assert!(f.exists(), "file dose not exists");
         }
     }

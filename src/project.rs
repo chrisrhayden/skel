@@ -32,13 +32,15 @@ pub struct FileTemplate {
 #[derive(Debug)]
 pub struct Project {
     pub name: String,
-    pub root_path: PathBuf,
-    pub root_string: String,
-    pub config_dir_string: String,
-    pub dirs: Vec<String>,
-    pub files: Vec<String>,
+    pub dirs: Option<Vec<String>>,
+    pub files: Option<Vec<String>>,
     pub build: Option<String>,
     pub templates: Option<Vec<FileTemplate>>,
+    pub root_path: PathBuf,
+    // these are for template slugs
+    pub root_string: String,
+    pub config_dir_string: String,
+    // toggles for the build proses
     pub dont_make_template: bool,
     pub dont_run_build: bool,
 }
@@ -50,29 +52,13 @@ impl Project {
         args: &SkelArgs,
         config: ProjectConfig,
     ) -> Self {
-        let config_dirs = if let Some(conf_dir) = config.dirs {
-            conf_dir
-        } else {
-            vec![]
-        };
-
-        let files = if let Some(mut all_files) = config.files {
-            for temp in config.templates.as_ref().unwrap().iter() {
-                all_files.push(temp.path.clone());
-            }
-
-            all_files
-        } else {
-            vec![]
-        };
-
         Self {
             name: args.name.to_owned(),
             root_path: PathBuf::from(&root),
             root_string: root,
             config_dir_string,
-            dirs: config_dirs,
-            files,
+            files: config.files,
+            dirs: config.dirs,
             build: config.build,
             templates: config.templates,
             dont_make_template: args.dont_make_templates,
@@ -135,26 +121,36 @@ impl Project {
             .to_owned()
     }
 
-    pub fn dir_iter(&self) -> ProjectPathIterator {
-        let root = self.root_path.to_str().expect("cant covert path to str");
+    pub fn dir_iter(&self) -> Option<ProjectPathIterator> {
+        if let Some(dirs) = self.dirs.as_ref() {
+            let root =
+                self.root_path.to_str().expect("cant covert path to str");
 
-        ProjectPathIterator::new(
-            root,
-            &self.name,
-            &self.config_dir_string,
-            &self.dirs,
-        )
+            Some(ProjectPathIterator::new(
+                root,
+                &self.name,
+                &self.config_dir_string,
+                dirs,
+            ))
+        } else {
+            None
+        }
     }
 
-    pub fn file_iter(&self) -> ProjectPathIterator {
-        let root = self.root_path.to_str().expect("cant covert path to str");
+    pub fn file_iter(&self) -> Option<ProjectPathIterator> {
+        if let Some(files) = self.files.as_ref() {
+            let root =
+                self.root_path.to_str().expect("cant covert path to str");
 
-        ProjectPathIterator::new(
-            root,
-            &self.name,
-            &self.config_dir_string,
-            &self.files,
-        )
+            Some(ProjectPathIterator::new(
+                root,
+                &self.name,
+                &self.config_dir_string,
+                files,
+            ))
+        } else {
+            None
+        }
     }
 
     pub fn template_iter(&self) -> Option<ProjectTemplateIterator> {
@@ -384,13 +380,13 @@ mod test {
 
         assert_eq!(project.name, "test_project");
 
-        for d in project.dirs {
+        for d in project.dirs.unwrap() {
             if d != "src" && d != "tests" && d != "tests/more_tests" {
                 assert!(false, "{} -- test dirs not found", d);
             }
         }
 
-        for f in project.files {
+        for f in project.files.unwrap() {
             if f != "src/main.rs" && f != "tests/test_main.rs" {
                 assert!(false, "{} -- test files not found", f);
             }
@@ -404,7 +400,7 @@ mod test {
     fn test_dirs_project_buf_iter() {
         let proj = make_fake_project(None);
 
-        let mut dir_iter = proj.dir_iter();
+        let mut dir_iter = proj.dir_iter().unwrap();
 
         assert_eq!(
             dir_iter.next(),
@@ -435,7 +431,7 @@ mod test {
     fn test_files_project_buf_iter() {
         let proj = make_fake_project(None);
 
-        let mut file_iter = proj.file_iter();
+        let mut file_iter = proj.file_iter().unwrap();
 
         assert_eq!(
             file_iter.next(),

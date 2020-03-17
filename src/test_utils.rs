@@ -45,7 +45,7 @@ impl TempSetup {
             self.project.as_ref().unwrap()
         };
 
-        for dir in project.dir_iter() {
+        for dir in project.dir_iter().unwrap() {
             fs::create_dir_all(dir)?;
         }
 
@@ -66,7 +66,7 @@ impl TempSetup {
             self.project.as_ref().unwrap()
         };
 
-        for file in project.file_iter() {
+        for file in project.file_iter().unwrap() {
             fs::File::create(file)?;
         }
 
