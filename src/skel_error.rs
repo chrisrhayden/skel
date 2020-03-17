@@ -3,6 +3,7 @@ use std::{error::Error, fmt};
 // basic error type enum to pattern match on
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SkelErrType {
+    BoxError,
     ProjectExists,
     IoError,
 }
@@ -12,6 +13,7 @@ impl fmt::Display for SkelErrType {
         let message = match self {
             SkelErrType::ProjectExists => String::from("ProjectExists"),
             SkelErrType::IoError => String::from("IoError"),
+            SkelErrType::BoxError => String::new(),
         };
 
         write!(f, "{}", message)
@@ -37,6 +39,18 @@ impl SkelError {
         let err_type = SkelErrType::IoError;
 
         SkelError::new(err_type, err_string)
+    }
+
+    #[allow(dead_code)]
+    pub fn from_box_err(box_err: Box<dyn Error>) -> SkelError {
+        let err_str = format!("{}", box_err);
+        let err_type = SkelErrType::BoxError;
+
+        SkelError::new(err_type, err_str)
+    }
+
+    pub fn into_string(self) -> String {
+        self.err_str
     }
 
     // this is only used in test at the moment

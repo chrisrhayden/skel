@@ -10,9 +10,7 @@ use skel::{
 fn main() -> Result<(), Box<dyn Error>> {
     let args = parse_args()?;
 
-    let mut project = resolve_default(args)?;
-
-    project.resolve_templates()?;
+    let project = resolve_default(args)?;
 
     make_project(&project)
 }

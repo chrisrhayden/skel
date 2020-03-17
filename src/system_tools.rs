@@ -12,7 +12,7 @@ fn make_bash_string(project: &Project) -> String {
 
     bash_string.insert_str(0, "#!/usr/bin/env bash\n\n");
 
-    project.template_str(&bash_string)
+    project.run_template(&bash_string)
 }
 
 fn make_cmd(root: &PathBuf, bash_str: &str) -> Command {

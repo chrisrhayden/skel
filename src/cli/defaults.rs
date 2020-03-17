@@ -2,7 +2,7 @@ use std::{collections::HashMap, env, error::Error, fs, path::PathBuf};
 
 use serde::Deserialize;
 
-use crate::{collect_project_config, template::template, Project};
+use crate::{collect_project_config, template::template, Project, ProjectArgs};
 
 use super::parse_args::SkelArgs;
 
@@ -13,6 +13,85 @@ pub type UserConfigResult = SkelResult<UserConfig>;
 pub struct UserConfig {
     pub projects: HashMap<String, String>,
     pub alias: HashMap<String, Vec<String>>,
+}
+
+fn make_config_from_toml(config_str: &str) -> UserConfigResult {
+    use std::io::Read;
+
+    let config_path = PathBuf::from(config_str);
+
+    if !config_path.exists() {
+        return Err(Box::from(format!(
+            "config dose not exists -- {}",
+            config_path.to_str().expect("cant get root path"),
+        )));
+    }
+
+    // TODO: more gracefully hand this
+    let mut conf_file = fs::File::open(&config_path)
+        .expect(&format!("can open file config path {:?}", config_path));
+
+    let mut config_str = String::new();
+
+    conf_file
+        .read_to_string(&mut config_str)
+        .expect("cant read to string");
+
+    // TODO: let the user know whats wrong in a nice way
+    let toml_conf = toml::from_str::<UserConfig>(&config_str)
+        .expect(&format!("TOML Error -- {}", config_str));
+
+    Ok(toml_conf)
+}
+
+// TODO: make the path delimiter and config name variables
+fn config_string_default() -> (String, String) {
+    let mut config_dir = env::var("HOME").expect("home not set");
+
+    // first make the directory
+    config_dir.push('/');
+    config_dir.push_str(".config");
+    config_dir.push('/');
+    config_dir.push_str("skel");
+
+    // then the actual file
+    let mut config_file = config_dir.clone();
+    config_file.push('/');
+    config_file.push_str("config.toml");
+
+    (config_file, config_dir)
+}
+
+fn collect_user_config() -> SkelResult<(UserConfig, String)> {
+    let (u_s, u_d) = config_string_default();
+
+    let conf = make_config_from_toml(&u_s)?;
+
+    Ok((conf, u_d))
+}
+
+fn resolve_user_config(
+    type_str: &str,
+    project_file: Option<&String>,
+) -> Result<(PathBuf, String), Box<dyn Error>> {
+    match project_file {
+        Some(project_file) => {
+            let config_dir_path = env::var("HOME").expect("HOME is not set");
+
+            Ok((PathBuf::from(project_file), config_dir_path))
+        }
+        None => {
+            let (user_config, config_dir_path) = collect_user_config()?;
+
+            let project_path = project_path_with_templateing(
+                type_str,
+                &user_config,
+                &config_dir_path,
+            )?;
+
+            Ok((project_path, config_dir_path))
+        }
+    }
 }
 
 fn find_project_file(
@@ -79,94 +158,14 @@ fn root_string_default_or(root_from_cli: &Option<String>) -> String {
     }
 }
 
-// TODO: make the path delimiter and config name variables
-fn config_string_default() -> (String, String) {
-    let mut config_dir = env::var("HOME").expect("home not set");
-
-    // first make the directory
-    config_dir.push('/');
-    config_dir.push_str(".config");
-    config_dir.push('/');
-    config_dir.push_str("skel");
-
-    // then the actual file
-    let mut config_file = config_dir.clone();
-    config_file.push('/');
-    config_file.push_str("config.toml");
-
-    (config_file, config_dir)
-}
-
-fn make_config_from_toml(config_str: &str) -> UserConfigResult {
-    use std::io::Read;
-
-    let config_path = PathBuf::from(config_str);
-
-    if !config_path.exists() {
-        return Err(Box::from(format!(
-            "config dose not exists -- {}",
-            config_path.to_str().expect("cant get root path"),
-        )));
-    }
-
-    // TODO: more gracefully hand this
-    let mut conf_file = fs::File::open(&config_path)
-        .expect(&format!("can open file config path {:?}", config_path));
-
-    let mut config_str = String::new();
-
-    conf_file
-        .read_to_string(&mut config_str)
-        .expect("cant read to string");
-
-    // TODO: let the user know whats wrong in a nice way
-    let toml_conf = toml::from_str::<UserConfig>(&config_str)
-        .expect(&format!("TOML Error -- {}", config_str));
-
-    Ok(toml_conf)
-}
-
-fn collect_user_config() -> SkelResult<(UserConfig, String)> {
-    let (u_s, u_d) = config_string_default();
-
-    let conf = make_config_from_toml(&u_s)?;
-
-    Ok((conf, u_d))
-}
-
 // last takes precedent:
 //      default > config > cli config
+// TODO: refactor in to smaller functions
 pub fn resolve_default(args: SkelArgs) -> SkelResult<Project> {
-    let (project_pathbuf, project_dir_str) = match &args.cli_project_file {
-        Some(project_file) => {
-            let config_dir_path = env::var("HOME").expect("HOME is not set");
+    let (project_pathbuf, config_dir_path) =
+        resolve_user_config(&args.type_str, args.cli_project_file.as_ref())?;
 
-            (PathBuf::from(project_file), config_dir_path)
-        }
-        None => {
-            let (user_config, config_dir_path) = collect_user_config()?;
-
-            (
-                project_path_with_templateing(
-                    &args.type_str,
-                    &user_config,
-                    &config_dir_path,
-                )?,
-                config_dir_path,
-            )
-        }
-    };
-
-    // return if project path dose not exists
-    if !project_pathbuf.exists() {
-        return Err(Box::from(format!(
-            "project path given dos not exists -- {}",
-            project_pathbuf.to_str().unwrap()
-        )));
-    }
-
-    let project_config = collect_project_config(&project_pathbuf)?;
-
+    let mut file_config = collect_project_config(&project_pathbuf)?;
     let mut root_string = root_string_default_or(&args.different_root);
     // set root to the project name not the current_dir
     // or the one given on the cli
@@ -174,12 +173,30 @@ pub fn resolve_default(args: SkelArgs) -> SkelResult<Project> {
     root_string.push('/');
     root_string.push_str(&args.name);
 
-    Ok(Project::new(
-        root_string,
-        project_dir_str,
-        &args,
-        project_config,
-    ))
+    file_config.resolve_project_templates(
+        &root_string,
+        &args.name,
+        &config_dir_path,
+    )?;
+
+    if file_config.files.is_none()
+        && file_config.dirs.is_none()
+        && file_config.build.is_none()
+    {
+        return Err(Box::from("project dos not have anything to do"));
+    }
+
+    let project_args = ProjectArgs {
+        args,
+        root: root_string,
+        dirs: file_config.dirs,
+        files: file_config.files,
+        build: file_config.build,
+        templates: file_config.templates,
+        config_dir_string: config_dir_path,
+    };
+
+    Ok(Project::new(project_args))
 }
 
 #[cfg(test)]
