@@ -88,38 +88,12 @@ pub struct Project {
     // these are for template slugs
     pub root_string: String,
     pub config_dir_string: String,
-<<<<<<< HEAD
     // toggles for the build proses
-=======
-    pub dirs: Option<Vec<String>>,
-    pub files: Option<Vec<String>>,
-    pub build: Option<String>,
-    pub templates: Option<Vec<ProjectTemplate>>,
->>>>>>> dev
     pub dont_make_template: bool,
     pub dont_run_build: bool,
 }
 
 impl Project {
-<<<<<<< HEAD
-    pub fn new(
-        root: String,
-        config_dir_string: String,
-        args: &SkelArgs,
-        config: ProjectConfig,
-    ) -> Self {
-        Self {
-            name: args.name.to_owned(),
-            root_path: PathBuf::from(&root),
-            root_string: root,
-            config_dir_string,
-            files: config.files,
-            dirs: config.dirs,
-            build: config.build,
-            templates: config.templates,
-            dont_make_template: args.dont_make_templates,
-            dont_run_build: args.dont_run_build,
-=======
     pub fn new(project_args: ProjectArgs) -> Self {
         Self {
             files: project_args.files.clone(),
@@ -132,7 +106,6 @@ impl Project {
             templates: project_args.templates.clone(),
             dont_make_template: project_args.args.dont_make_templates,
             dont_run_build: project_args.args.dont_run_build,
->>>>>>> dev
         }
     }
 
@@ -153,7 +126,6 @@ impl Project {
     }
 
     pub fn dir_iter(&self) -> Option<ProjectPathIterator> {
-<<<<<<< HEAD
         if let Some(dirs) = self.dirs.as_ref() {
             let root =
                 self.root_path.to_str().expect("cant covert path to str");
@@ -170,24 +142,6 @@ impl Project {
     }
 
     pub fn file_iter(&self) -> Option<ProjectPathIterator> {
-        if let Some(files) = self.files.as_ref() {
-            let root =
-                self.root_path.to_str().expect("cant covert path to str");
-
-            Some(ProjectPathIterator::new(
-                root,
-                &self.name,
-                &self.config_dir_string,
-                files,
-            ))
-        } else {
-            None
-        }
-=======
-        if self.dirs.is_none() {
-            return None;
-        }
-
         Some(ProjectPathIterator::new(
             &self.root_string,
             &self.name,
@@ -201,46 +155,15 @@ impl Project {
         ))
     }
 
-    pub fn file_iter(&self) -> Option<ProjectPathIterator> {
-        if self.files.is_none() {
-            return None;
-        }
-
-        let mut files = self
-            .files
-            .as_ref()
-            .unwrap()
-            .iter()
-            .map(|ele| ele.as_str())
-            .collect::<Vec<&str>>();
-
-        if let Some(templates) = self.templates.as_ref() {
-            let mut temps = templates
-                .iter()
-                .map(|te| te.path.as_str())
-                .collect::<Vec<&str>>();
-
-            files.append(&mut temps);
-        };
-
-        Some(ProjectPathIterator::new(
-            &self.root_string,
-            &self.name,
-            &self.config_dir_string,
-            files,
-        ))
->>>>>>> dev
-    }
-
     pub fn template_iter(&self) -> Option<ProjectTemplateIterator> {
         let root = self.root_path.to_str().expect("cant covert path to str");
 
-        match &self.templates {
-            Some(templates) => Some(ProjectTemplateIterator::new(
+        match self.templates {
+            Some(ref templates) => Some(ProjectTemplateIterator::new(
                 root,
                 &self.name,
                 &self.config_dir_string,
-                &templates,
+                templates,
             )),
             None => None,
         }
@@ -503,17 +426,6 @@ mod test {
 
         assert_eq!(project.name, "test_project");
 
-<<<<<<< HEAD
-        for d in project.dirs.unwrap() {
-            if d != "src" && d != "tests" && d != "tests/more_tests" {
-                assert!(false, "{} -- test dirs not found", d);
-            }
-        }
-
-        for f in project.files.unwrap() {
-            if f != "src/main.rs" && f != "tests/test_main.rs" {
-                assert!(false, "{} -- test files not found", f);
-=======
         let test_dirs = ["src", "tests", "tests/more_tests"];
 
         for d in project.dirs.unwrap() {
@@ -528,7 +440,6 @@ mod test {
         for f in project.files.unwrap() {
             if !test_files.contains(&f.as_str()) {
                 assert!(false, "{} -- bad test files found", f);
->>>>>>> dev
             }
         }
 

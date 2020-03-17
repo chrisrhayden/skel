@@ -45,14 +45,10 @@ impl TempSetup {
             self.project.as_ref().unwrap()
         };
 
-<<<<<<< HEAD
-        for dir in project.dir_iter().unwrap() {
-=======
         for dir in project
             .dir_iter()
             .expect("cant get dirs in make_fake_project_dirs")
         {
->>>>>>> dev
             fs::create_dir_all(dir)?;
         }
 
@@ -73,14 +69,10 @@ impl TempSetup {
             self.project.as_ref().unwrap()
         };
 
-<<<<<<< HEAD
-        for file in project.file_iter().unwrap() {
-=======
         for file in project
             .file_iter()
             .expect("cant get files in make_fake_project_files")
         {
->>>>>>> dev
             fs::File::create(file)?;
         }
 

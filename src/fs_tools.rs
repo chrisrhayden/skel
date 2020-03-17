@@ -38,41 +38,21 @@ where
     Ok(buf)
 }
 
-fn make_project_dirs(project: &Project) -> Result<(), Box<dyn Error>> {
-<<<<<<< HEAD
+fn make_project_dirs(project: &mut Project) -> Result<(), Box<dyn Error>> {
     if let Some(dir_iter) = project.dir_iter() {
         for dir in dir_iter {
             fs::create_dir_all(dir)?;
         }
-=======
-    let dirs = match project.dir_iter() {
-        Some(dirs) => dirs,
-        None => return Ok(()),
-    };
-
-    for dir in dirs {
-        fs::create_dir_all(dir)?;
->>>>>>> dev
     }
 
     Ok(())
 }
 
 fn make_project_files(project: &Project) -> Result<(), Box<dyn Error>> {
-<<<<<<< HEAD
     if let Some(file_iter) = project.file_iter() {
         for file in file_iter {
             fs::File::create(file)?;
         }
-=======
-    let files = match project.file_iter() {
-        Some(files) => files,
-        None => return Ok(()),
-    };
-
-    for file in files {
-        fs::File::create(&file)?;
->>>>>>> dev
     }
 
     Ok(())
@@ -169,10 +149,6 @@ mod test {
 
         assert!(src.exists(), "didn't make the root src");
 
-<<<<<<< HEAD
-        for d in proj.dir_iter().unwrap() {
-            assert!(d.exists(), "{:?} -- dir dose not exists", d);
-=======
         for d in test_dirs {
             let mut dir_w_root = root_path.clone();
 
@@ -184,7 +160,6 @@ mod test {
                 "{:?} -- dir dose not exists",
                 dir_w_root
             );
->>>>>>> dev
         }
 
         assert!(true);
@@ -221,8 +196,6 @@ mod test {
         assert!(main_f.exists(), "failed to make src/main.rs");
 
         for f in proj.file_iter().unwrap() {
-<<<<<<< HEAD
-=======
             let mut file_w_root = root_path.clone();
 
             file_w_root.push(&proj.name);
@@ -233,8 +206,6 @@ mod test {
                 "{:?} -- dir dose not exists",
                 file_w_root
             );
->>>>>>> dev
-            assert!(f.exists(), "file dose not exists");
         }
     }
 
