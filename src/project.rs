@@ -132,7 +132,12 @@ impl Project {
             &self.root_string,
             &self.name,
             &self.config_dir_string,
-            self.dirs.as_ref().unwrap(),
+            self.dirs
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|ele| ele.as_str())
+                .collect::<Vec<&str>>(),
         ))
     }
 
@@ -141,11 +146,28 @@ impl Project {
             return None;
         }
 
+        let mut files = self
+            .files
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|ele| ele.as_str())
+            .collect::<Vec<&str>>();
+
+        if let Some(templates) = self.templates.as_ref() {
+            let mut temps = templates
+                .iter()
+                .map(|te| te.path.as_str())
+                .collect::<Vec<&str>>();
+
+            files.append(&mut temps);
+        };
+
         Some(ProjectPathIterator::new(
             &self.root_string,
             &self.name,
             &self.config_dir_string,
-            &self.files.as_ref().unwrap(),
+            files,
         ))
     }
 
@@ -178,7 +200,7 @@ pub struct ProjectPathIterator<'a> {
     // for templating
     name: &'a str,
     conf: &'a str,
-    array: &'a [String],
+    array: Vec<&'a str>,
 }
 
 impl<'a> ProjectPathIterator<'a> {
@@ -187,7 +209,7 @@ impl<'a> ProjectPathIterator<'a> {
         root: &'a str,
         name: &'a str,
         conf: &'a str,
-        array: &'a [String],
+        array: Vec<&'a str>,
     ) -> Self {
         Self {
             root,
@@ -214,14 +236,11 @@ impl<'a> Iterator for ProjectPathIterator<'a> {
             return None;
         }
 
-        // get the current element
-        let next_str = &self.array[self.curr];
+        // get and template the current element
+        let path_str = self.template(self.array[self.curr]);
 
         // go to the next element
         self.curr += 1;
-
-        // template the current element
-        let path_str = self.template(next_str);
 
         // if the path is not yet full add the root str
         let path_buf = if path_str.starts_with('/') {
