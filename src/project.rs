@@ -142,17 +142,31 @@ impl Project {
     }
 
     pub fn file_iter(&self) -> Option<ProjectPathIterator> {
-        Some(ProjectPathIterator::new(
-            &self.root_string,
-            &self.name,
-            &self.config_dir_string,
-            self.dirs
-                .as_ref()
-                .unwrap()
-                .iter()
-                .map(|ele| ele.as_str())
-                .collect::<Vec<&str>>(),
-        ))
+        if let Some(files) = self.files.as_ref() {
+            let mut b_files =
+                files.iter().map(|ele| ele.as_str()).collect::<Vec<&str>>();
+
+            let root =
+                self.root_path.to_str().expect("cant covert path to str");
+
+            if let Some(templates) = self.templates.as_ref() {
+                let mut t_paths = templates
+                    .iter()
+                    .map(|ele| ele.path.as_str())
+                    .collect::<Vec<&str>>();
+
+                b_files.append(&mut t_paths);
+            }
+
+            Some(ProjectPathIterator::new(
+                root,
+                &self.name,
+                &self.config_dir_string,
+                files.iter().map(|ele| ele.as_str()).collect::<Vec<&str>>(),
+            ))
+        } else {
+            None
+        }
     }
 
     pub fn template_iter(&self) -> Option<ProjectTemplateIterator> {

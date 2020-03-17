@@ -94,7 +94,7 @@ impl TempSetup {
 
         if let Err(err) = self.make_fake_project_files(project) {
             eprintln!("{}", err);
-            panic!("can t make files {}", err);
+            panic!("can t make files: {}", err);
         }
 
         // TODO: add templating
