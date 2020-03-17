@@ -7,7 +7,7 @@ use toml;
 
 use crate::{
     cli::{SkelArgs, UserConfig},
-    project::{Project, ProjectConfig},
+    project::{Project, ProjectArgs, ProjectConfigFile},
 };
 
 #[derive(Default)]
@@ -45,7 +45,10 @@ impl TempSetup {
             self.project.as_ref().unwrap()
         };
 
-        for dir in project.dir_iter() {
+        for dir in project
+            .dir_iter()
+            .expect("cant get dirs in make_fake_project_dirs")
+        {
             fs::create_dir_all(dir)?;
         }
 
@@ -66,7 +69,10 @@ impl TempSetup {
             self.project.as_ref().unwrap()
         };
 
-        for file in project.file_iter() {
+        for file in project
+            .file_iter()
+            .expect("cant get files in make_fake_project_files")
+        {
             fs::File::create(file)?;
         }
 
@@ -139,13 +145,11 @@ impl Drop for TempSetup {
     }
 }
 
-pub fn make_fake_project_config() -> ProjectConfig {
+pub fn make_fake_project_config() -> ProjectConfigFile {
     let fake_toml = make_fake_project_toml();
 
-    let conf = toml::from_str::<ProjectConfig>(&fake_toml)
-        .expect("cant make config from fake toml");
-
-    conf
+    toml::from_str::<ProjectConfigFile>(&fake_toml)
+        .expect("cant make config from fake toml")
 }
 
 pub fn make_fake_project(root: Option<PathBuf>) -> Project {
@@ -166,7 +170,17 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
 
     let args = SkelArgs::make_fake(&name, "fake_type");
 
-    Project::new(root, conf_path, &args, conf)
+    let p_args = ProjectArgs {
+        build: conf.build,
+        files: conf.files,
+        dirs: conf.dirs,
+        root,
+        args,
+        templates: conf.templates,
+        config_dir_string: conf_path,
+    };
+
+    Project::new(p_args)
 }
 
 pub fn make_fake_user_config() -> UserConfig {
@@ -222,7 +236,7 @@ path ="tests/test_main.rs"
 template = "// no tests yet for {{name}}"
 
 [[templates]]
-path = "src/test_include"
+path = "src/test_include.txt"
 include = "docs/test_include.txt"
 "#
     .to_string()

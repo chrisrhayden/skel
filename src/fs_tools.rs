@@ -39,7 +39,12 @@ where
 }
 
 fn make_project_dirs(project: &Project) -> Result<(), Box<dyn Error>> {
-    for dir in project.dir_iter() {
+    let dirs = match project.dir_iter() {
+        Some(dirs) => dirs,
+        None => return Ok(()),
+    };
+
+    for dir in dirs {
         fs::create_dir_all(dir)?;
     }
 
@@ -47,13 +52,20 @@ fn make_project_dirs(project: &Project) -> Result<(), Box<dyn Error>> {
 }
 
 fn make_project_files(project: &Project) -> Result<(), Box<dyn Error>> {
-    for file in project.file_iter() {
-        fs::File::create(file)?;
+    let files = match project.file_iter() {
+        Some(files) => files,
+        None => return Ok(()),
+    };
+
+    for file in files {
+        fs::File::create(&file)?;
     }
 
     Ok(())
 }
 
+// the files should exist so unless template_iter makes the path wrong
+// everything should be fine by this pint
 fn write_template(
     (template_path, template): (PathBuf, String),
 ) -> Result<(), io::Error> {
@@ -61,7 +73,9 @@ fn write_template(
 
     let mut template_file = fs::File::create(template_path)?;
 
-    template_file.write_all(template.as_bytes())?;
+    if !template.is_empty() {
+        template_file.write_all(template.as_bytes())?;
+    }
 
     Ok(())
 }
@@ -89,7 +103,8 @@ fn make_project_templates(project: &Project) -> Result<(), Box<dyn Error>> {
 pub fn make_project_tree(project: &Project) -> Result<(), SkelError> {
     // check if something exists at root, root being /path/to/project_name
     if project.root_path.exists() {
-        let root_string = project.root_string();
+        let root_string =
+            format!("project destination exists -- {}", project.root_string());
 
         let err_type = SkelErrType::ProjectExists;
 
@@ -126,9 +141,11 @@ mod test {
         src.push("test_project");
         src.push("src");
 
+        let test_dirs = proj.dirs.as_ref().unwrap().clone();
+
         // the make_project_dirs should not fail on making the same dir twice
         // add src again to test making twice
-        proj.dirs.push(String::from("src"));
+        proj.dirs.as_mut().unwrap().push(String::from("src"));
 
         if let Err(err) = make_project_dirs(&proj) {
             eprintln!("{}", err);
@@ -138,8 +155,17 @@ mod test {
 
         assert!(src.exists(), "didn't make the root src");
 
-        for d in proj.dir_iter() {
-            assert!(d.exists(), "{:?} -- dir dose not exists", d);
+        for d in test_dirs {
+            let mut dir_w_root = root_path.clone();
+
+            dir_w_root.push(&proj.name);
+            dir_w_root.push(&d);
+
+            assert!(
+                dir_w_root.exists(),
+                "{:?} -- dir dose not exists",
+                dir_w_root
+            );
         }
 
         assert!(true);
@@ -149,10 +175,11 @@ mod test {
     fn test_make_project_files() {
         let mut temp = TempSetup::default();
         let root_path: PathBuf = temp.setup();
+
         temp.make_fake_project_dirs(None)
             .expect("cant make temp dirs");
 
-        let proj = make_fake_project(Some(root_path));
+        let proj = make_fake_project(Some(root_path.clone()));
 
         // dont bother testing make_project_dirs as that already being done and
         // if it fail then this function should fail
@@ -174,13 +201,25 @@ mod test {
 
         assert!(main_f.exists(), "failed to make src/main.rs");
 
-        for f in proj.file_iter() {
+        for f in proj.file_iter().unwrap() {
+            let mut file_w_root = root_path.clone();
+
+            file_w_root.push(&proj.name);
+            file_w_root.push(&f);
+
+            assert!(
+                file_w_root.exists(),
+                "{:?} -- dir dose not exists",
+                file_w_root
+            );
             assert!(f.exists(), "file dose not exists");
         }
     }
 
     #[test]
     fn test_make_project_root_exits() {
+        use crate::skel_error::SkelErrType::*;
+
         let mut temp = TempSetup::default();
         let root_path: PathBuf = temp.setup();
 
@@ -197,8 +236,8 @@ mod test {
 
         if let Err(err) = make_project_tree(&proj) {
             match err.kind() {
-                SkelErrType::ProjectExists => assert!(true),
-                SkelErrType::IoError => {
+                ProjectExists => assert!(true),
+                _ => {
                     eprintln!("{}", err);
                     assert!(false, "io err");
                 }

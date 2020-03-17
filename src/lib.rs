@@ -15,14 +15,16 @@ use crate::{
     system_tools::call_build_script,
 };
 
-pub use crate::project::Project;
+pub use crate::project::{
+    Project, ProjectArgs, ProjectConfigFile, ProjectTemplate,
+};
+
+pub use crate::fs_tools::collect_string_from_file;
 
 ///! make a new project from a Project struct
 pub fn make_project(project: &Project) -> Result<(), Box<dyn Error>> {
     // first make the project tree
-    if let Err(err) = make_project_tree(project) {
-        return Err(Box::from(err.to_string()));
-    };
+    make_project_tree(project).map_err(|err| err.into_string())?;
 
     // then try and run a build script
     if !project.dont_run_build && project.build.is_some() {

@@ -2,8 +2,14 @@ short term:
 - check if paths are relative or absolute and to not add / to the name if added
 - add a way to not run build script or templates
 - use a templating library
+- put optional variables back in
+- add cli arg to show/hide build output
 
 long term:
+- decide how flexible this should be
+    * for one should you be able to make files out side the project dir
+    * should i bother with fake root or something for the build script
+- allow a way to run the build script before trying to do anything else
 - remove template file if not making templates
 - make errors better
 - add a way to include a script to build or maybe a build method
