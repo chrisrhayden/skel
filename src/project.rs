@@ -126,46 +126,30 @@ impl Project {
     }
 
     pub fn dir_iter(&self) -> Option<ProjectPathIterator> {
-        if let Some(dirs) = self.dirs.as_ref() {
-            let root =
-                self.root_path.to_str().expect("cant covert path to str");
+        let root = self.root_path.to_str().expect("cant covert path to str");
 
-            Some(ProjectPathIterator::new(
+        match self.dirs.as_ref() {
+            Some(dirs) => Some(ProjectPathIterator::new(
                 root,
                 &self.name,
                 &self.config_dir_string,
-                dirs.iter().map(|ele| ele.as_str()).collect::<Vec<&str>>(),
-            ))
-        } else {
-            None
+                dirs,
+            )),
+            None => None,
         }
     }
 
     pub fn file_iter(&self) -> Option<ProjectPathIterator> {
-        if let Some(files) = self.files.as_ref() {
-            let mut b_files =
-                files.iter().map(|ele| ele.as_str()).collect::<Vec<&str>>();
+        let root = self.root_path.to_str().expect("cant covert path to str");
 
-            let root =
-                self.root_path.to_str().expect("cant covert path to str");
-
-            if let Some(templates) = self.templates.as_ref() {
-                let mut t_paths = templates
-                    .iter()
-                    .map(|ele| ele.path.as_str())
-                    .collect::<Vec<&str>>();
-
-                b_files.append(&mut t_paths);
-            }
-
-            Some(ProjectPathIterator::new(
+        match self.files.as_ref() {
+            Some(files) => Some(ProjectPathIterator::new(
                 root,
                 &self.name,
                 &self.config_dir_string,
-                files.iter().map(|ele| ele.as_str()).collect::<Vec<&str>>(),
-            ))
-        } else {
-            None
+                files,
+            )),
+            None => None,
         }
     }
 
@@ -198,7 +182,7 @@ pub struct ProjectPathIterator<'a> {
     // for templating
     name: &'a str,
     conf: &'a str,
-    array: Vec<&'a str>,
+    array: &'a Vec<String>,
 }
 
 impl<'a> ProjectPathIterator<'a> {
@@ -207,7 +191,7 @@ impl<'a> ProjectPathIterator<'a> {
         root: &'a str,
         name: &'a str,
         conf: &'a str,
-        array: Vec<&'a str>,
+        array: &'a Vec<String>,
     ) -> Self {
         Self {
             root,
@@ -235,7 +219,7 @@ impl<'a> Iterator for ProjectPathIterator<'a> {
         }
 
         // get and template the current element
-        let path_str = self.template(self.array[self.curr]);
+        let path_str = self.template(&self.array[self.curr]);
 
         // go to the next element
         self.curr += 1;
@@ -311,7 +295,7 @@ impl<'a> Iterator for ProjectTemplateIterator<'a> {
                 self.template(template_str)
             } else {
                 eprintln!(
-                    "WARNING: no template included\n\
+                    "WARNING: no template included: \
                     pleas add the necessary variables to the config"
                 );
 
@@ -525,11 +509,46 @@ mod test {
         // tmp/temp_root/test_project
         let first_test = (
             PathBuf::from("/tmp/test_root/test_project/src/main.rs"),
-            r#"fn main() {
-    println!("hello test_project");
-}
-"#
-            .to_string(),
+            "fn main() {\n    println!(\"hello test_project\");\n}\n"
+                .to_string(),
+        );
+
+        let first = template_iter
+            .next()
+            .expect("failed to call next on template_iter");
+
+        assert_eq!(first.0, first_test.0, "first path is not the same");
+        assert_eq!(first.1, first_test.1, "first string is not the same");
+
+        let second_test = (
+            PathBuf::from("/tmp/test_root/test_project/tests/test_main.rs"),
+            String::from("// no tests yet for test_project"),
+        );
+
+        let second = template_iter
+            .next()
+            .expect("failed to call next on template_iter");
+
+        assert_eq!(second.0, second_test.0, "second path is not the same");
+        assert_eq!(second.1, second_test.1, "second string is not the same");
+    }
+
+    #[test]
+    fn test_config_template_iter_no_files() {
+        let mut proj = make_fake_project(None);
+
+        proj.files.take();
+
+        assert!(proj.files.is_none(), "did not empty files");
+
+        let mut template_iter =
+            proj.template_iter().expect("cant get template iter");
+
+        // tmp/temp_root/test_project
+        let first_test = (
+            PathBuf::from("/tmp/test_root/test_project/src/main.rs"),
+            "fn main() {\n    println!(\"hello test_project\");\n}\n"
+                .to_string(),
         );
 
         let first = template_iter
