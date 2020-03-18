@@ -92,8 +92,7 @@ fn make_project_templates(project: &Project) -> Result<(), Box<dyn Error>> {
 ///!     - directory's, (mkdir path/to/dir)
 ///!     - blank files (touch path/to/file)
 ///!     - file templates (echo "$template" > path/to/file)
-///! these functions works like unix's mkdir or touch
-///! templates are another story
+///! these functions works like unix's mkdir or touch or cp (for temple's)
 pub fn make_project_tree(project: &Project) -> Result<(), SkelError> {
     // check if something exists at root, root being /path/to/project_name
     if project.root_path.exists() {

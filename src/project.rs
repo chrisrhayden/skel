@@ -30,8 +30,8 @@ impl ProjectConfigFile {
         // add templates or include files to files list
         if let Some(ref mut temp_files) = self.templates.take() {
             for template_struct in temp_files.iter_mut() {
-                // the include variable is present force the template to whatever
-                // is in the include path if it exists
+                // if the include variable is present force the template to
+                // whatever is in the include path if it exists
                 if let Some(include_str) = template_struct.include.as_ref() {
                     let include_path = PathBuf::from(template(
                         root,
