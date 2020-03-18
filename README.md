@@ -62,7 +62,7 @@ directory's and files will be made like you are using `mkdir -p` or `touch`
 
 the `build` script will have `#!/usr/bin/env bash\n\n` appended to the top of the string
 
-other then templating the `templates` they (heh) will act like you ran
+other then templating the `templates` (heh) they will act like you ran
 ```bash
 cat path/to/main.js > /tmp/example_project/src/main.js
 ```
@@ -159,6 +159,7 @@ the config only has two options, `projects` and `aliases`. projects takes a key 
 an example config looks like
 
 ```toml
+# ~/.config/skel/config.toml
 # the paths to the projects
 # {{config-dir}} will correspond to ~/.config/skel
 [projects]
