@@ -186,8 +186,18 @@ pub fn resolve_default(args: SkelArgs) -> SkelResult<Project> {
         return Err(Box::from("project dos not have anything to do"));
     }
 
+    let build_first = if args.build_first
+        || (file_config.build_first.is_some()
+            && file_config.build_first.unwrap())
+    {
+        true
+    } else {
+        false
+    };
+
     let project_args = ProjectArgs {
         args,
+        build_first,
         root: root_string,
         dirs: file_config.dirs,
         files: file_config.files,
