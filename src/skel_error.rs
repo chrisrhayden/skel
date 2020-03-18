@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::{error::Error, fmt};
 
 // basic error type enum to pattern match on
@@ -41,7 +43,6 @@ impl SkelError {
         SkelError::new(err_type, err_string)
     }
 
-    #[allow(dead_code)]
     pub fn from_box_err(box_err: Box<dyn Error>) -> SkelError {
         let err_str = format!("{}", box_err);
         let err_type = SkelErrType::BoxError;

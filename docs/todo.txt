@@ -1,4 +1,5 @@
 short term:
+- refactor skelargs to be useful or get rid of it
 - allow a way to run the build script before trying to do anything else
 - use a templating library
 - add cli arg to show/hide build output
