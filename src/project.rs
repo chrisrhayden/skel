@@ -17,6 +17,7 @@ pub struct ProjectConfigFile {
     pub dirs: Option<Vec<String>>,
     pub files: Option<Vec<String>>,
     pub build: Option<String>,
+    pub build_first: Option<bool>,
     pub templates: Option<Vec<ProjectTemplate>>,
 }
 
@@ -71,6 +72,7 @@ pub struct ProjectArgs {
     pub dirs: Option<Vec<String>>,
     pub root: String,
     pub build: Option<String>,
+    pub build_first: bool,
     pub templates: Option<Vec<ProjectTemplate>>,
     pub config_dir_string: String,
     pub args: SkelArgs,
@@ -107,7 +109,7 @@ impl Project {
             templates: project_args.templates,
             dont_make_template: project_args.args.dont_make_templates,
             dont_run_build: project_args.args.dont_run_build,
-            build_first: project_args.args.build_first,
+            build_first: project_args.build_first,
         }
     }
 
@@ -417,11 +419,20 @@ mod test {
             .resolve_project_templates(&root, &name, &config_dir)
             .expect("cant resolve templates");
 
+        let build_first = if args.build_first
+            || (config.build_first.is_some() && config.build_first.unwrap())
+        {
+            true
+        } else {
+            false
+        };
+
         let proj_args = ProjectArgs {
             root,
             args,
             dirs: config.dirs,
             build: config.build,
+            build_first,
             files: config.files,
             templates: config.templates,
             config_dir_string: config_dir,

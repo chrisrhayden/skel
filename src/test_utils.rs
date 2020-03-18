@@ -174,7 +174,16 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
 
     let args = SkelArgs::make_fake(&name, "fake_type");
 
+    let build_first = if args.build_first
+        || (conf.build_first.is_some() && conf.build_first.unwrap())
+    {
+        true
+    } else {
+        false
+    };
+
     let p_args = ProjectArgs {
+        build_first,
         build: conf.build,
         files: conf.files,
         dirs: conf.dirs,
