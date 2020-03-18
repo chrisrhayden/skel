@@ -12,6 +12,7 @@ pub struct SkelArgs {
     pub cli_project_file: Option<String>,
     pub dont_run_build: bool,
     pub dont_make_templates: bool,
+    pub build_first: bool,
 }
 
 impl SkelArgs {
@@ -22,8 +23,9 @@ impl SkelArgs {
             different_root: None,
             cli_config_path: None,
             cli_project_file: None,
-            dont_run_build: true,
-            dont_make_templates: true,
+            dont_run_build: false,
+            dont_make_templates: false,
+            build_first: false,
         }
     }
 }
@@ -78,6 +80,12 @@ fn get_arg_matches() -> ArgMatches {
                 .long("no-templating")
                 .help("dont make templates"),
         )
+        .arg(
+            Arg::with_name("run build first")
+                .short('b')
+                .long("build-first")
+                .help("run the build script before making the rest of the project"),
+        )
         .get_matches()
 }
 
@@ -110,6 +118,7 @@ pub fn parse_args() -> Result<SkelArgs, Box<dyn Error>> {
         return Err(Box::from(String::from("bad args")));
     };
 
+    // i some how cant make clap exclusive for -p project_file and type_str
     if name.is_none() && project_type.is_some() {
         skel_args.name = project_type
             .map(String::from)
@@ -127,6 +136,7 @@ pub fn parse_args() -> Result<SkelArgs, Box<dyn Error>> {
 
     skel_args.dont_make_templates = matches.is_present("no templating");
     skel_args.dont_run_build = matches.is_present("no build");
+    skel_args.build_first = matches.is_present("run build first");
 
     Ok(skel_args)
 }

@@ -23,15 +23,23 @@ pub use crate::fs_tools::collect_string_from_file;
 
 ///! make a new project from a Project struct
 pub fn make_project(project: &Project) -> Result<(), Box<dyn Error>> {
+    if project.build_first && !project.dont_run_build && project.build.is_some()
+    {
+        call_build_script(project)?;
+    }
+
     // first make the project tree
     make_project_tree(project).map_err(|err| err.into_string())?;
 
     // then try and run a build script
-    if !project.dont_run_build && project.build.is_some() {
-        call_build_script(project)
-    } else {
-        Ok(())
+    if !project.build_first
+        && !project.dont_run_build
+        && project.build.is_some()
+    {
+        call_build_script(project)?;
     }
+
+    Ok(())
 
     // TODO: maybe a quick test to see of it worked
 }

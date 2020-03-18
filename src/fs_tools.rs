@@ -1,7 +1,8 @@
-// NOTE: the only function to do fs system checks is the make_project_tree,
-//       im not sure if that should change
-// NOTE: the std lib said they might change create_dir_all or File::create
-//       make sure to adjust if they do
+// NOTE:
+// 1) the only function to do fs system checks is the make_project_tree,
+// Im not sure if that should change
+// 2) the std lib said they might change create_dir_all or File::create
+// make sure to adjust if they do
 
 use std::{
     error::Error,
@@ -275,10 +276,9 @@ mod test {
             .read_to_string(&mut buf)
             .expect("cant read file to string");
 
-        let test_main_file_string = r#"fn main() {
-    println!("hello test_project");
-}
-"#;
+        let test_main_file_string = "fn main() {\n    \
+            println!(\"hello test_project\");\n}\n";
+
         assert_eq!(
             buf, test_main_file_string,
             "main_file template did not work"
@@ -300,5 +300,90 @@ mod test {
             include_buf, "test include value",
             "did not make include_file right"
         );
+    }
+
+    #[test]
+    fn test_make_fake_project_tree() {
+        use std::io::Read;
+
+        let mut temp = TempSetup::default();
+        let root = temp.setup();
+
+        match make_project_tree(&temp.project.as_ref().unwrap()) {
+            Ok(_) => assert!(true),
+            Err(err) => assert!(false, "Error: {}", err),
+        };
+
+        let mut project_root = root.clone();
+        project_root.push("test_project");
+
+        let mut main_rs = project_root.clone();
+        main_rs.push("src");
+        main_rs.push("main.rs");
+
+        assert!(main_rs.exists(), "main rs dose not exists");
+
+        let mut main_file =
+            fs::File::open(main_rs).expect("cant get main files");
+
+        let mut buf = String::new();
+
+        main_file
+            .read_to_string(&mut buf)
+            .expect("cant read file to string");
+
+        let test_main_file_string = "fn main() {\n    \
+            println!(\"hello test_project\");\n}\n";
+
+        assert_eq!(
+            buf, test_main_file_string,
+            "main_file template did not work"
+        );
+
+        let mut more_test = project_root.clone();
+        more_test.push("tests/more_tests");
+    }
+
+    #[test]
+    fn test_make_fake_project_tree_no_templating() {
+        use std::io::Read;
+
+        let mut temp = TempSetup::default();
+        let root = temp.setup();
+
+        temp.project.as_mut().unwrap().templates.take();
+
+        match make_project_tree(&temp.project.as_ref().unwrap()) {
+            Ok(_) => assert!(true),
+            Err(err) => assert!(false, "Error: {}", err),
+        };
+
+        let mut project_root = root.clone();
+        project_root.push("test_project");
+
+        let mut main_rs = project_root.clone();
+        main_rs.push("src");
+        main_rs.push("main.rs");
+
+        assert!(main_rs.exists(), "main rs dose not exists");
+
+        let mut main_file =
+            fs::File::open(main_rs).expect("cant get main files");
+
+        let mut buf = String::new();
+
+        main_file
+            .read_to_string(&mut buf)
+            .expect("cant read file to string");
+
+        let test_main_file_string = "";
+
+        assert_eq!(
+            buf, test_main_file_string,
+            "main_file template did not work"
+        );
+
+        let mut more_test = project_root.clone();
+        more_test.push("tests/more_tests");
     }
 }

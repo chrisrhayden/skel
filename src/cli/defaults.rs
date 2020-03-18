@@ -76,7 +76,7 @@ fn resolve_user_config(
 ) -> Result<(PathBuf, String), Box<dyn Error>> {
     match project_file {
         Some(project_file) => {
-            let config_dir_path = env::var("HOME").expect("HOME is not set");
+            let (_, config_dir_path) = config_string_default();
 
             Ok((PathBuf::from(project_file), config_dir_path))
         }
@@ -270,7 +270,7 @@ mod test {
 
     #[test]
     fn test_project_path_with_templateing() {
-        let fake_config_dir = String::from("/tmp/fake_skel");
+        let fake_config_dir = String::from("/tmp/skel");
 
         let conf = make_fake_user_config();
 
@@ -289,7 +289,7 @@ mod test {
 
         assert_eq!(
             project_path,
-            PathBuf::from("/tmp/fake_skel/projects/basic_cpp.toml"),
+            PathBuf::from("/tmp/skel/projects/basic_cpp.toml"),
             "failed to template path"
         );
     }
@@ -301,8 +301,9 @@ mod test {
 
         let mut temp_config = root.clone();
 
-        temp_config.push("fake_skel");
-        temp_config.push("fake_config.toml");
+        temp_config.push(".config");
+        temp_config.push("skel");
+        temp_config.push("config.toml");
 
         temp.make_fake_user_config().expect("cant make user config");
 
@@ -357,5 +358,69 @@ mod test {
             user_config.alias, alias,
             "failed to make user config alias's"
         );
+    }
+
+    #[test]
+    fn test_resolve_user_config_no_user_path() {
+        let mut temp = TempSetup::default();
+        let root = temp.setup();
+
+        let fake_home = root.to_str().unwrap();
+        env::set_var("HOME", fake_home);
+
+        temp.make_fake_user_config()
+            .expect("did not make fake config");
+
+        let type_str = "cpp";
+        let user_path = None;
+
+        let mut fake_config = fake_home.to_string();
+
+        fake_config.push_str("/.config/skel");
+
+        let mut fake_config_file = fake_config.to_string();
+
+        fake_config_file.push_str("/projects/basic_cpp.toml");
+
+        match resolve_user_config(type_str, user_path) {
+            Ok((proj_path, proj_dir)) => {
+                assert_eq!(
+                    proj_path,
+                    PathBuf::from(fake_config_file),
+                    "did not find c++ toml file"
+                );
+
+                assert_eq!(
+                    proj_dir, fake_config,
+                    "did not make proj_dir right"
+                );
+            }
+            Err(err) => assert!(false, "Error: {}", err),
+        };
+    }
+
+    #[test]
+    fn test_resolve_user_config_user_path_provided() {
+        let type_str = "cpp";
+
+        let user_path_str = String::from("/tmp/skel/projects/cpp.toml");
+
+        env::set_var("HOME", "/home/test");
+
+        match resolve_user_config(type_str, Some(&user_path_str)) {
+            Ok((proj_path, proj_dir)) => {
+                assert_eq!(
+                    proj_path,
+                    PathBuf::from("/tmp/skel/projects/cpp.toml"),
+                    "did not find c++ toml file"
+                );
+
+                assert_eq!(
+                    proj_dir, "/home/test/.config/skel",
+                    "did not make proj_dir right"
+                );
+            }
+            Err(err) => assert!(false, "Error: {}", err),
+        };
     }
 }

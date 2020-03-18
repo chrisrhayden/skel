@@ -1,27 +1,27 @@
 short term:
-- check if paths are relative or absolute and to not add / to the name if added
-- add a way to not run build script or templates
+- allow a way to run the build script before trying to do anything else
 - use a templating library
-- put optional variables back in
 - add cli arg to show/hide build output
 
 long term:
 - decide how flexible this should be
     * for one should you be able to make files out side the project dir
     * should i bother with fake root or something for the build script
-- allow a way to run the build script before trying to do anything else
 - remove template file if not making templates
 - make errors better
-- add a way to include a script to build or maybe a build method
-  like makepkgs
 - make auto complete better
+- maybe add include to build
 
 test:
+- refactor test suit
 - make test for optional config variables
 - make test for cli interface
 - test for failures
     * there are templates that aren't in the file list
 
 done:
-- make NewInnerError methoids for from_io_error 
+- make SkelInnerError methods for from_io_error
+- check if paths are relative or absolute and to not add / to the name if added
 - add include file to config
+- add a way to not run build script or templates
+- put optional variables back in

@@ -107,11 +107,12 @@ impl TempSetup {
 
         let mut fake_config = self.root_buf();
 
-        fake_config.push("fake_skel");
+        fake_config.push(".config");
+        fake_config.push("skel");
 
         fs::create_dir_all(&fake_config).expect("cant make config dir");
 
-        fake_config.push("fake_config.toml");
+        fake_config.push("config.toml");
 
         let mut config_file = fs::File::create(fake_config)?;
 
@@ -159,14 +160,17 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
         String::from("/tmp/test_root")
     };
 
-    let conf = make_fake_project_config();
-
-    let conf_path = String::from("/tmp/fake_config/config.toml");
-
     let name = String::from("test_project");
 
     root.push('/');
     root.push_str(&name);
+
+    let conf_path_dir = String::from("/tmp/fake_config/");
+
+    let mut conf = make_fake_project_config();
+
+    conf.resolve_project_templates(&root, &name, &conf_path_dir)
+        .expect("cant resolve project templates in make_fake_project");
 
     let args = SkelArgs::make_fake(&name, "fake_type");
 
@@ -177,7 +181,7 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
         root,
         args,
         templates: conf.templates,
-        config_dir_string: conf_path,
+        config_dir_string: conf_path_dir,
     };
 
     Project::new(p_args)
@@ -209,7 +213,8 @@ basic_python = ["py", "p"]
 }
 
 pub fn make_fake_project_toml() -> String {
-    r#"dirs = [
+    r#"
+dirs = [
     "src",
     "tests",
     "tests/more_tests"
@@ -220,6 +225,7 @@ files = [
 ]
 
 build = """
+touch test_build
 if [[ -d test_project ]]; then
     echo "running in $PWD"
 fi"""

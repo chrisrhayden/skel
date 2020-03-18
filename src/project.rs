@@ -28,7 +28,7 @@ impl ProjectConfigFile {
         config_dir_path: &str,
     ) -> Result<(), Box<dyn Error>> {
         // add templates or include files to files list
-        if let Some(ref mut temp_files) = self.templates.take() {
+        if let Some(ref mut temp_files) = self.templates.as_mut() {
             for template_struct in temp_files.iter_mut() {
                 // if the include variable is present force the template to
                 // whatever is in the include path if it exists
@@ -91,6 +91,7 @@ pub struct Project {
     // toggles for the build proses
     pub dont_make_template: bool,
     pub dont_run_build: bool,
+    pub build_first: bool,
 }
 
 impl Project {
@@ -106,6 +107,7 @@ impl Project {
             templates: project_args.templates,
             dont_make_template: project_args.args.dont_make_templates,
             dont_run_build: project_args.args.dont_run_build,
+            build_first: project_args.args.build_first,
         }
     }
 
@@ -401,7 +403,8 @@ mod test {
 
     #[test]
     fn test_new_project() {
-        let config = make_fake_project_config();
+        let mut config = make_fake_project_config();
+
         let config_dir = String::from("/tmp/fake_config/config.toml");
 
         let root = String::from("/tmp/test_path");
@@ -409,6 +412,10 @@ mod test {
         let name = String::from("test_project");
 
         let args = SkelArgs::make_fake(&name, "fake_type");
+
+        config
+            .resolve_project_templates(&root, &name, &config_dir)
+            .expect("cant resolve templates");
 
         let proj_args = ProjectArgs {
             root,
@@ -541,8 +548,9 @@ mod test {
 
         assert!(proj.files.is_none(), "did not empty files");
 
-        let mut template_iter =
-            proj.template_iter().expect("cant get template iter");
+        let mut template_iter = proj.template_iter().expect(
+            "cant get template iter in test_config_template_iter_no_files",
+        );
 
         // tmp/temp_root/test_project
         let first_test = (

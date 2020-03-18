@@ -81,11 +81,11 @@ mod test {
 
         let new_string = make_bash_string(&proj);
         let hand_made = String::from(
-            r#"#!/usr/bin/env bash
-
-if [[ -d test_project ]]; then
-    echo "running in $PWD"
-fi"#,
+            "#!/usr/bin/env bash\n\n\
+            touch test_build\n\
+            if [[ -d test_project ]]; then\n    \
+                echo \"running in $PWD\"\n\
+            fi",
         );
 
         assert_eq!(new_string, hand_made, "didn't make string correctly");
