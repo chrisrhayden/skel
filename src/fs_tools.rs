@@ -1,6 +1,5 @@
 // NOTE:
-// 1) the only function to do fs system checks is the make_project_tree,
-// Im not sure if that should change
+// 1) none of the functions do checks, Im not sure if or how that should change
 // 2) the std lib said they might change create_dir_all or File::create
 // make sure to adjust if they do
 
@@ -10,10 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{
-    project::Project,
-    skel_error::{SkelErrType, SkelError},
-};
+use crate::{project::Project, skel_error::SkelError};
 
 pub fn collect_string_from_file<P>(path: P) -> Result<String, Box<dyn Error>>
 where
@@ -95,16 +91,6 @@ fn make_project_templates(project: &Project) -> Result<(), Box<dyn Error>> {
 ///!     - file templates (echo "$template" > path/to/file)
 ///! these functions works like unix's mkdir or touch or cp (for temple's)
 pub fn make_project_tree(project: &Project) -> Result<(), SkelError> {
-    // check if something exists at root, root being /path/to/project_name
-    if project.root_path.exists() {
-        let root_string =
-            format!("project destination exists -- {}", project.root_string());
-
-        let err_type = SkelErrType::ProjectExists;
-
-        return Err(SkelError::new(err_type, root_string));
-    }
-
     make_project_dirs(project).map_err(SkelError::from_io_err)?;
 
     make_project_files(project).map_err(SkelError::from_io_err)?;
