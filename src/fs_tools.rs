@@ -196,39 +196,6 @@ mod test {
     }
 
     #[test]
-    fn test_make_project_root_exits() {
-        use crate::skel_error::SkelErrType::*;
-
-        let mut temp = TempSetup::default();
-        let root_path: PathBuf = temp.setup();
-
-        let proj = make_fake_project(Some(root_path.clone()));
-
-        let mut src = root_path.clone();
-        src.push("test_project");
-        src.push("src");
-
-        if let Err(err) = fs::create_dir_all(&src) {
-            eprintln!("{}", err);
-            assert!(false, "something is fucked");
-        }
-
-        if let Err(err) = make_project_tree(&proj) {
-            match err.kind() {
-                ProjectExists => assert!(true),
-                _ => {
-                    eprintln!("{}", err);
-                    assert!(false, "io err");
-                }
-            }
-        } else {
-            assert!(false, "did not fail");
-        };
-
-        assert!(true);
-    }
-
-    #[test]
     fn test_make_project_templates() {
         use std::io::Read;
 

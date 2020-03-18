@@ -51,3 +51,44 @@ pub fn make_project(project: &Project) -> Result<(), Box<dyn Error>> {
 
     // TODO: maybe a quick test to see of it worked
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use std::{fs, path::PathBuf};
+
+    use crate::test_utils::{make_fake_project, TempSetup};
+
+    #[test]
+    fn test_make_project_root_exits() {
+        let mut temp = TempSetup::default();
+        let root_path: PathBuf = temp.setup();
+
+        let proj = make_fake_project(Some(root_path.clone()));
+
+        let mut src = root_path.clone();
+        src.push("test_project");
+        src.push("src");
+
+        if let Err(err) = fs::create_dir_all(&src) {
+            eprintln!("{}", err);
+            assert!(false, "something is fucked");
+        }
+
+        if let Err(err) = make_project(&proj) {
+            let err_string =
+                format!("project destination exists -- {}", proj.root_string());
+
+            assert_eq!(
+                format!("{}", err),
+                err_string,
+                "did not find project path"
+            );
+        } else {
+            assert!(false, "did not fail");
+        };
+
+        assert!(true);
+    }
+}
