@@ -1,15 +1,13 @@
-use std::{collections::HashMap, env, error::Error, path::PathBuf};
+use std::{collections::HashMap, env, error::Error, fs, path::PathBuf};
 
 use serde::Deserialize;
 
-use crate::{
-    fs_tools::collect_string_from_file, template::template, Project,
-    ProjectConfig,
-};
+use crate::{collect_project_config, template::template, Project};
 
 use super::parse_args::SkelArgs;
 
 pub type SkelResult<T> = Result<T, Box<dyn Error>>;
+pub type UserConfigResult = SkelResult<UserConfig>;
 
 #[derive(Debug, Deserialize)]
 pub struct UserConfig {
@@ -17,7 +15,9 @@ pub struct UserConfig {
     pub alias: HashMap<String, Vec<String>>,
 }
 
-fn make_config_from_toml(config_path: &PathBuf) -> SkelResult<UserConfig> {
+fn make_config_from_toml(config_path: &PathBuf) -> UserConfigResult {
+    use std::io::Read;
+
     if !config_path.exists() {
         return Err(Box::from(format!(
             "config dose not exists -- {}",
@@ -25,7 +25,14 @@ fn make_config_from_toml(config_path: &PathBuf) -> SkelResult<UserConfig> {
         )));
     }
 
-    let config_str = collect_string_from_file(&config_path)?;
+    let mut conf_file =
+        fs::File::open(&config_path).expect("cant open config file");
+
+    let mut config_str = String::new();
+
+    conf_file
+        .read_to_string(&mut config_str)
+        .expect("cant read config file to string");
 
     // TODO: let the user know whats wrong in a nice way
     // idk, maybe just say bad config with the file name
@@ -35,6 +42,7 @@ fn make_config_from_toml(config_path: &PathBuf) -> SkelResult<UserConfig> {
     Ok(toml_conf)
 }
 
+// TODO: make the path delimiter and config name variables
 fn config_string_default() -> (PathBuf, PathBuf) {
     let mut config_dir = env::var("HOME")
         .expect("home not set")
@@ -58,6 +66,33 @@ fn collect_user_config() -> SkelResult<(UserConfig, PathBuf)> {
     let conf = make_config_from_toml(&config_path)?;
 
     Ok((conf, config_dir))
+}
+
+fn resolve_user_config(
+    type_str: &str,
+    project_file: Option<&String>,
+) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
+    match project_file {
+        Some(project_file) => {
+            let (_, config_dir_path) = config_string_default();
+
+            Ok((PathBuf::from(project_file), config_dir_path))
+        }
+        None => {
+            let (user_config, config_dir_path) = collect_user_config()?;
+
+            let project_config_path = project_path_with_templateing(
+                type_str,
+                &user_config,
+                config_dir_path
+                    .to_str()
+                    .as_ref()
+                    .expect("cant get config path str"),
+            )?;
+
+            Ok((project_config_path, config_dir_path))
+        }
+    }
 }
 
 fn find_project_file(
@@ -106,57 +141,6 @@ fn project_path_with_templateing(
     let p_string = template("", "", &config_dir, &p_string);
 
     Ok(PathBuf::from(p_string))
-}
-
-fn resolve_user_config(
-    type_str: &str,
-    project_file: Option<&String>,
-) -> SkelResult<(PathBuf, PathBuf)> {
-    match project_file {
-        Some(project_file) => {
-            let (_, config_dir_path) = config_string_default();
-
-            Ok((PathBuf::from(project_file), config_dir_path))
-        }
-        None => {
-            let (user_config, config_dir_path) = collect_user_config()?;
-
-            let project_config_path = project_path_with_templateing(
-                type_str,
-                &user_config,
-                config_dir_path
-                    .to_str()
-                    .as_ref()
-                    .expect("cant get config path str"),
-            )?;
-
-            Ok((project_config_path, config_dir_path))
-        }
-    }
-}
-
-// return a config from a toml file
-pub fn collect_project_config(
-    path: &PathBuf,
-) -> Result<ProjectConfig, Box<dyn Error>> {
-    // return if project path dose not exists
-    if !path.exists() {
-        return Err(Box::from(format!("path given dose exists -- {:?}", path)));
-    }
-
-    let config_string = collect_string_from_file(&path)?;
-
-    let config = match toml::from_str::<ProjectConfig>(&config_string) {
-        Ok(val) => val,
-        Err(err) => {
-            return Err(Box::from(format!(
-                "Toml Error in project file: {}",
-                err
-            )))
-        }
-    };
-
-    Ok(config)
 }
 
 fn resolve_project_root(name: &str, root_from_cli: &Option<String>) -> String {
@@ -220,10 +204,7 @@ pub fn resolve_default(args: SkelArgs) -> SkelResult<Project> {
         files: file_config.files,
         build: file_config.build,
         templates: file_config.templates,
-        config_dir_string: config_dir_path
-            .to_str()
-            .expect("cant get config_dir_path as str")
-            .to_string(),
+        config_dir_string: config_dir_path,
         name: args.name,
         project_root_path: PathBuf::from(&root_string),
         project_root_string: root_string,
@@ -239,9 +220,7 @@ pub fn resolve_default(args: SkelArgs) -> SkelResult<Project> {
 mod test {
     use super::*;
 
-    use crate::test_utils::{
-        make_fake_conifg_file, make_fake_user_config, TempSetup,
-    };
+    use crate::test_utils::{make_fake_user_config, TempSetup};
 
     #[test]
     fn test_config_string_default_or_default() {
@@ -258,7 +237,8 @@ mod test {
 
         // then the actual file
         let mut config_file = config_dir.clone();
-        config_file.push("config.toml");
+        config_file.push('/');
+        config_file.push_str("config.toml");
 
         assert_eq!(
             test_config_dir, config_dir,
@@ -345,7 +325,9 @@ mod test {
 
         temp.make_fake_user_config().expect("cant make user config");
 
-        let user_config = match make_config_from_toml(&temp_config) {
+        let user_config = match make_config_from_toml(
+            temp_config.to_str().expect("cant get config path"),
+        ) {
             Err(err) => {
                 assert!(false, "{}", err);
                 unreachable!();
@@ -410,15 +392,13 @@ mod test {
         let type_str = "cpp";
         let user_path = None;
 
-        let mut fake_config = fake_home.clone().parse::<PathBuf>().unwrap();
+        let mut fake_config = fake_home.to_string();
 
-        fake_config.push(".config");
-        fake_config.push("skel");
+        fake_config.push_str("/.config/skel");
 
-        let mut fake_config_file = fake_config.clone();
+        let mut fake_config_file = fake_config.to_string();
 
-        fake_config_file.push("projects");
-        fake_config_file.push("basic_cpp.toml");
+        fake_config_file.push_str("/projects/basic_cpp.toml");
 
         match resolve_user_config(type_str, user_path) {
             Ok((proj_path, proj_dir)) => {
@@ -454,39 +434,11 @@ mod test {
                 );
 
                 assert_eq!(
-                    proj_dir,
-                    PathBuf::from("/home/test/.config/skel"),
+                    proj_dir, "/home/test/.config/skel",
                     "did not make proj_dir right"
                 );
             }
             Err(err) => assert!(false, "Error: {}", err),
-        };
-    }
-
-    #[test]
-    fn test_collect_config() {
-        let mut temp = TempSetup::default();
-        let mut fake_path = temp.setup();
-
-        fake_path.push("fake_project.toml");
-
-        if !make_fake_conifg_file(&fake_path) {
-            assert!(false, "failed to make fake config in temp dir");
-        }
-
-        match collect_project_config(&fake_path) {
-            Err(err) => assert!(false, "{} bad toml config", err),
-            Ok(config) => {
-                assert_eq!(
-                    config.dirs.as_ref().unwrap()[0],
-                    String::from("src"),
-                    "did not get the right name"
-                );
-
-                for entry in config.dirs.as_ref().unwrap().iter() {
-                    assert_eq!(entry.is_empty(), false, "no dirs in array");
-                }
-            }
         };
     }
 }

@@ -1,9 +1,9 @@
 short term:
-- refactor all the struct shenanigans
+- refactor error handling
+- refactor error handling explicitly for fs_tools.rs
 - use a templating library
 - add cli arg to show/hide build output
 - remove except and unwrap where it is possible
-- refactor clap logic to be useful or get rid of it
 
 long term:
 - maybe come up with a way to point to a directory to recreate
@@ -14,6 +14,7 @@ long term:
 - make errors better
 - make auto complete better
 - maybe add include to build
+- maybe refactor clap logic to be useful or get rid of it
 
 test:
 - refactor test suit
@@ -30,3 +31,4 @@ done:
 - put optional variables back in
 - allow a way to run the build script before trying to do anything else
 - rename root to project root
+- refactor all the struct shenanigans

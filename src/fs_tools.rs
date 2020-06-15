@@ -17,16 +17,7 @@ where
 {
     use std::io::Read;
 
-    let mut include_file = match fs::File::open(&path) {
-        // TODO: match the specific error
-        Ok(val) => val,
-        Err(_) => {
-            return Err(Box::from(format!(
-                "missing template include path - {:?}",
-                path
-            )))
-        }
-    };
+    let mut include_file = fs::File::open(&path)?;
 
     let mut buf = String::new();
 
@@ -86,10 +77,9 @@ fn make_project_templates(project: &Project) -> Result<(), Box<dyn Error>> {
 
 ///! the interface for making the project tree
 ///! this will make
-///!     - directory's, (mkdir path/to/dir)
-///!     - blank files (touch path/to/file)
+///!     - directory's, (mkdir -p path/to/dir)
+///!     - blank files (mkdir -p path/to && touch path/to/file)
 ///!     - file templates (echo "$template" > path/to/file)
-///! these functions works like unix's mkdir or touch or cp (for temple's)
 pub fn make_project_tree(project: &Project) -> Result<(), SkelError> {
     make_project_dirs(project).map_err(SkelError::from_io_err)?;
 

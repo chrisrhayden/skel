@@ -3,7 +3,7 @@ use std::{error::Error, path::PathBuf, process::Command};
 use crate::project::Project;
 
 fn make_bash_string(project: &Project) -> String {
-    // if unwind fails here we have other issues
+    // project.build should always exist because this is only run if it dose
     let mut bash_string = project
         .build
         .as_ref()
@@ -30,7 +30,7 @@ fn make_cmd(root: &PathBuf, bash_str: &str) -> Command {
     cmd
 }
 
-fn run_cmd(cmd: &mut Command, show_output: bool) -> Result<(), Box<dyn Error>> {
+fn run_cmd(show_output: bool, cmd: &mut Command) -> Result<(), Box<dyn Error>> {
     let output = match cmd.output() {
         Ok(val) => val,
         Err(err) => {
@@ -46,24 +46,23 @@ fn run_cmd(cmd: &mut Command, show_output: bool) -> Result<(), Box<dyn Error>> {
         Ok(())
     } else {
         Err(Box::from(format!(
-            "Command Error {}",
+            "Command Error: {}",
             String::from_utf8_lossy(&output.stderr)
         )))
     }
 }
 
 pub fn call_build_script(project: &Project) -> Result<(), Box<dyn Error>> {
+    // if no build script present then just return
     if project.build.is_none() {
-        return Err(Box::from(String::from(
-            "call_build_script was called without a build script to use",
-        )));
+        return Ok(());
     }
 
     let bash_string = make_bash_string(project);
 
     let mut cmd = make_cmd(&project.project_root_path, &bash_string);
 
-    run_cmd(&mut cmd, project.show_build_output)
+    run_cmd(project.show_build_output, &mut cmd)
 }
 
 #[cfg(test)]
