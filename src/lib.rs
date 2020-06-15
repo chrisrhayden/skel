@@ -4,7 +4,6 @@ pub mod cli;
 mod fs_tools;
 mod process_tools;
 mod project;
-mod skel_error;
 mod template;
 mod test_utils;
 
@@ -32,7 +31,7 @@ pub fn make_project(project: &Project) -> Result<(), Box<dyn Error>> {
     }
 
     // make the project tree
-    make_project_tree(project).map_err(|err| err.into_string())?;
+    make_project_tree(project)?;
 
     // then try and run a build script
     if !project.build_first && !project.dont_run_build {

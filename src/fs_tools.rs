@@ -9,7 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{project::Project, skel_error::SkelError};
+use crate::project::Project;
 
 pub fn collect_string_from_file<P>(path: P) -> Result<String, Box<dyn Error>>
 where
@@ -80,15 +80,15 @@ fn make_project_templates(project: &Project) -> Result<(), Box<dyn Error>> {
 ///!     - directory's, (mkdir -p path/to/dir)
 ///!     - blank files (mkdir -p path/to && touch path/to/file)
 ///!     - file templates (echo "$template" > path/to/file)
-pub fn make_project_tree(project: &Project) -> Result<(), SkelError> {
-    make_project_dirs(project).map_err(SkelError::from_io_err)?;
+pub fn make_project_tree(project: &Project) -> Result<(), Box<dyn Error>> {
+    make_project_dirs(project)?;
 
-    make_project_files(project).map_err(SkelError::from_io_err)?;
+    make_project_files(project)?;
 
     if project.dont_make_template {
         Ok(())
     } else {
-        make_project_templates(project).map_err(SkelError::from_io_err)
+        make_project_templates(project)
     }
 }
 
