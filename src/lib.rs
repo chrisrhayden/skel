@@ -16,7 +16,7 @@ use crate::{
 };
 
 pub use crate::project::{
-    Project, ProjectArgs, ProjectConfigFile, ProjectTemplate,
+    Project, ProjectArgs, ProjectConfig, ProjectTemplate,
 };
 
 pub use crate::fs_tools::collect_string_from_file;

@@ -83,13 +83,13 @@ fn resolve_user_config(
         None => {
             let (user_config, config_dir_path) = collect_user_config()?;
 
-            let project_path = project_path_with_templateing(
+            let project_config_path = project_path_with_templateing(
                 type_str,
                 &user_config,
                 &config_dir_path,
             )?;
 
-            Ok((project_path, config_dir_path))
+            Ok((project_config_path, config_dir_path))
         }
     }
 }
@@ -145,8 +145,8 @@ fn project_path_with_templateing(
     Ok(PathBuf::from(p_string))
 }
 
-fn root_string_default_or(root_from_cli: &Option<String>) -> String {
-    if let Some(from_cli) = root_from_cli {
+fn resolve_project_root(name: &str, root_from_cli: &Option<String>) -> String {
+    let mut r_string = if let Some(from_cli) = root_from_cli {
         from_cli.to_owned()
     } else {
         // default to current_dir
@@ -155,23 +155,27 @@ fn root_string_default_or(root_from_cli: &Option<String>) -> String {
             .to_str()
             .expect("cant get str from current dir")
             .to_owned()
-    }
+    };
+
+    // set root to the project name not the current_dir
+    // or the one given on the cli
+    // TODO: make this generic for windows maybe
+    r_string.push('/');
+    r_string.push_str(name);
+
+    r_string
 }
 
 // last takes precedent:
 //      default > config > cli config
 // TODO: refactor in to smaller functions
 pub fn resolve_default(args: SkelArgs) -> SkelResult<Project> {
-    let (project_pathbuf, config_dir_path) =
+    let (config_pathbuf, config_dir_path) =
         resolve_user_config(&args.type_str, args.cli_project_file.as_ref())?;
 
-    let mut file_config = collect_project_config(&project_pathbuf)?;
-    let mut root_string = root_string_default_or(&args.different_root);
-    // set root to the project name not the current_dir
-    // or the one given on the cli
-    // TODO: make this generic for windows maybe
-    root_string.push('/');
-    root_string.push_str(&args.name);
+    let mut file_config = collect_project_config(&config_pathbuf)?;
+    let mut root_string =
+        resolve_project_root(&args.name, &args.different_root);
 
     file_config.resolve_project_templates(
         &root_string,
@@ -183,7 +187,7 @@ pub fn resolve_default(args: SkelArgs) -> SkelResult<Project> {
         && file_config.dirs.is_none()
         && file_config.build.is_none()
     {
-        return Err(Box::from("project dos not have anything to do"));
+        return Err(Box::from("project dose not have anything to do"));
     }
 
     let build_first = if args.build_first

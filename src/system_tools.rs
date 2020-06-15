@@ -39,7 +39,7 @@ fn run_cmd(cmd: &mut Command, show_output: bool) -> Result<(), Box<dyn Error>> {
     };
 
     if output.status.success() {
-        if !output.stdout.is_empty() {
+        if !output.stdout.is_empty() && show_output {
             print!("{}", String::from_utf8_lossy(&output.stdout));
         }
 
@@ -63,7 +63,7 @@ pub fn call_build_script(project: &Project) -> Result<(), Box<dyn Error>> {
 
     let mut cmd = make_cmd(&project.project_root_path, &bash_string);
 
-    run_cmd(&mut cmd, project.show_output)
+    run_cmd(&mut cmd, project.show_build_output)
 }
 
 #[cfg(test)]

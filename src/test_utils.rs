@@ -7,7 +7,7 @@ use toml;
 
 use crate::{
     cli::{SkelArgs, UserConfig},
-    project::{Project, ProjectArgs, ProjectConfigFile},
+    project::{Project, ProjectArgs, ProjectConfig},
 };
 
 #[derive(Default)]
@@ -146,10 +146,10 @@ impl Drop for TempSetup {
     }
 }
 
-pub fn make_fake_project_config() -> ProjectConfigFile {
+pub fn make_fake_project_config() -> ProjectConfig {
     let fake_toml = make_fake_project_toml();
 
-    toml::from_str::<ProjectConfigFile>(&fake_toml)
+    toml::from_str::<ProjectConfig>(&fake_toml)
         .expect("cant make config from fake toml")
 }
 

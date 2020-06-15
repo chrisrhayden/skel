@@ -13,7 +13,7 @@ use crate::{
 
 // a config to deserialize project files in toml
 #[derive(Debug, Deserialize)]
-pub struct ProjectConfigFile {
+pub struct ProjectConfig {
     pub dirs: Option<Vec<String>>,
     pub files: Option<Vec<String>>,
     pub build: Option<String>,
@@ -21,7 +21,7 @@ pub struct ProjectConfigFile {
     pub templates: Option<Vec<ProjectTemplate>>,
 }
 
-impl ProjectConfigFile {
+impl ProjectConfig {
     pub fn resolve_project_templates(
         &mut self,
         root: &str,
@@ -111,6 +111,7 @@ impl Project {
             dont_make_template: project_args.args.dont_make_templates,
             dont_run_build: project_args.args.dont_run_build,
             build_first: project_args.build_first,
+            show_build_output: project_args.args.show_build_output,
         }
     }
 
@@ -336,7 +337,7 @@ impl<'a> Iterator for ProjectTemplateIterator<'a> {
 // return a config from a toml file
 pub fn collect_project_config(
     path: &Path,
-) -> Result<ProjectConfigFile, Box<dyn Error>> {
+) -> Result<ProjectConfig, Box<dyn Error>> {
     use std::io::Read;
 
     // return if project path dose not exists
@@ -350,7 +351,7 @@ pub fn collect_project_config(
 
     dir_config.read_to_string(&mut buf)?;
 
-    let config = match toml::from_str::<ProjectConfigFile>(&buf) {
+    let config = match toml::from_str::<ProjectConfig>(&buf) {
         Ok(val) => val,
         Err(err) => {
             return Err(Box::from(format!(

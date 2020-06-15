@@ -1,9 +1,9 @@
 short term:
-- refactor clap logic to be useful or get rid of it
+- refactor all the struct shenanigans
 - use a templating library
 - add cli arg to show/hide build output
 - remove except and unwrap where it is possible
-- refactor all the struct shenanigans
+- refactor clap logic to be useful or get rid of it
 
 long term:
 - maybe come up with a way to point to a directory to recreate
