@@ -37,7 +37,7 @@ fn make_config_from_toml(config_path: &PathBuf) -> SkelResult<UserConfig> {
 
 fn config_string_default() -> (PathBuf, PathBuf) {
     let mut config_dir = env::var("HOME")
-        .expect("home not set")
+        .expect("HOME not set")
         .parse::<PathBuf>()
         .expect("cant make path buf from config string");
 

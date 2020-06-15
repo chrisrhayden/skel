@@ -2,7 +2,6 @@ short term:
 
 long term:
 - make errors better
-- remove except and unwrap where it is possible
 - use a templating library
 - decide how flexible / intricate this should be
     * for one should you be able to make files out side the project dir
