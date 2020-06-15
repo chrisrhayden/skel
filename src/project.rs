@@ -1,19 +1,12 @@
-use std::{
-    error::Error,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{error::Error, path::PathBuf};
 
 use serde::Deserialize;
-use toml;
 
-use crate::{
-    cli::SkelArgs, fs_tools::collect_string_from_file, template::template,
-};
+use crate::{fs_tools::collect_string_from_file, template::template};
 
 // a config to deserialize project files in toml
 #[derive(Debug, Deserialize)]
-pub struct ProjectConfigFile {
+pub struct ProjectConfig {
     pub dirs: Option<Vec<String>>,
     pub files: Option<Vec<String>>,
     pub build: Option<String>,
@@ -21,7 +14,7 @@ pub struct ProjectConfigFile {
     pub templates: Option<Vec<ProjectTemplate>>,
 }
 
-impl ProjectConfigFile {
+impl ProjectConfig {
     pub fn resolve_project_templates(
         &mut self,
         root: &str,
@@ -67,18 +60,7 @@ pub struct ProjectTemplate {
     pub include: Option<String>,
 }
 
-pub struct ProjectArgs {
-    pub files: Option<Vec<String>>,
-    pub dirs: Option<Vec<String>>,
-    pub root: String,
-    pub build: Option<String>,
-    pub build_first: bool,
-    pub templates: Option<Vec<ProjectTemplate>>,
-    pub config_dir_string: String,
-    pub args: SkelArgs,
-}
-
-// the root, current_dir + given on cli plus name, i.e. pwd/project_name
+///! A fully resolved and ready to make project
 #[derive(Debug)]
 pub struct Project {
     pub name: String,
@@ -86,36 +68,38 @@ pub struct Project {
     pub files: Option<Vec<String>>,
     pub build: Option<String>,
     pub templates: Option<Vec<ProjectTemplate>>,
-    pub root_path: PathBuf,
+    pub project_root_path: PathBuf,
     // these are for template slugs
-    pub root_string: String,
+    pub project_root_string: String,
     pub config_dir_string: String,
     // toggles for the build proses
     pub dont_make_template: bool,
     pub dont_run_build: bool,
     pub build_first: bool,
+    pub show_build_output: bool,
 }
 
 impl Project {
-    pub fn new(project_args: ProjectArgs) -> Self {
-        Self {
-            files: project_args.files,
-            dirs: project_args.dirs,
-            name: project_args.args.name,
-            root_path: PathBuf::from(&project_args.root),
-            root_string: project_args.root,
-            config_dir_string: project_args.config_dir_string,
-            build: project_args.build,
-            templates: project_args.templates,
-            dont_make_template: project_args.args.dont_make_templates,
-            dont_run_build: project_args.args.dont_run_build,
-            build_first: project_args.build_first,
-        }
-    }
+    // pub fn new(project_args: ProjectArgs) -> Self {
+    //     Self {
+    //         files: project_args.files,
+    //         dirs: project_args.dirs,
+    //         name: project_args.args.name,
+    //         project_root_path: PathBuf::from(&project_args.root),
+    //         project_root_string: project_args.root,
+    //         config_dir_string: project_args.config_dir_string,
+    //         build: project_args.build,
+    //         templates: project_args.templates,
+    //         dont_make_template: project_args.args.dont_make_templates,
+    //         dont_run_build: project_args.args.dont_run_build,
+    //         build_first: project_args.build_first,
+    //         show_build_output: project_args.args.show_build_output,
+    //     }
+    // }
 
     pub fn run_template(&self, to_template: &str) -> String {
         template(
-            &self.root_string,
+            &self.project_root_string,
             &self.name,
             &self.config_dir_string,
             to_template,
@@ -123,14 +107,17 @@ impl Project {
     }
 
     pub fn root_string(&self) -> String {
-        self.root_path
+        self.project_root_path
             .to_str()
             .expect("cant get root string")
             .to_owned()
     }
 
     pub fn dir_iter(&self) -> Option<ProjectPathIterator> {
-        let root = self.root_path.to_str().expect("cant covert path to str");
+        let root = self
+            .project_root_path
+            .to_str()
+            .expect("cant covert path to str");
 
         match self.dirs.as_ref() {
             Some(dirs) => Some(ProjectPathIterator::new(
@@ -144,7 +131,10 @@ impl Project {
     }
 
     pub fn file_iter(&self) -> Option<ProjectPathIterator> {
-        let root = self.root_path.to_str().expect("cant covert path to str");
+        let root = self
+            .project_root_path
+            .to_str()
+            .expect("cant covert path to str");
 
         match self.files.as_ref() {
             Some(files) => Some(ProjectPathIterator::new(
@@ -158,7 +148,10 @@ impl Project {
     }
 
     pub fn template_iter(&self) -> Option<ProjectTemplateIterator> {
-        let root = self.root_path.to_str().expect("cant covert path to str");
+        let root = self
+            .project_root_path
+            .to_str()
+            .expect("cant covert path to str");
 
         match self.templates {
             Some(ref templates) => Some(ProjectTemplateIterator::new(
@@ -283,8 +276,6 @@ impl<'a> ProjectTemplateIterator<'a> {
 impl<'a> Iterator for ProjectTemplateIterator<'a> {
     type Item = (PathBuf, String);
 
-    // there should be very little trouble here, maybe do some checks as we take
-    // in data from ProjectConfig
     fn next(&mut self) -> Option<Self::Item> {
         if self.curr >= self.max_len {
             return None;
@@ -323,85 +314,13 @@ impl<'a> Iterator for ProjectTemplateIterator<'a> {
     }
 }
 
-// return a config from a toml file
-pub fn collect_project_config(
-    path: &Path,
-) -> Result<ProjectConfigFile, Box<dyn Error>> {
-    use std::io::Read;
-
-    // return if project path dose not exists
-    if !path.exists() {
-        return Err(Box::from(format!("path given dose exists -- {:?}", path)));
-    }
-
-    let mut dir_config = fs::File::open(path)?;
-
-    let mut buf = String::new();
-
-    dir_config.read_to_string(&mut buf)?;
-
-    let config = match toml::from_str::<ProjectConfigFile>(&buf) {
-        Ok(val) => val,
-        Err(err) => {
-            return Err(Box::from(format!(
-                "Toml Error in project file: {}",
-                err
-            )))
-        }
-    };
-
-    Ok(config)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
 
-    use crate::test_utils::{
-        make_fake_project, make_fake_project_config, make_fake_project_toml,
-        TempSetup,
-    };
+    use crate::cli::SkelArgs;
 
-    fn make_fake_conifg_file(root: &Path) -> bool {
-        use std::io::Write;
-
-        let toml_str = make_fake_project_toml();
-        let mut fake_conf =
-            fs::File::create(root).expect("cant make file in temp");
-
-        fake_conf
-            .write_all(toml_str.as_bytes())
-            .expect("cant write to fake toml file");
-
-        true
-    }
-
-    #[test]
-    fn test_collect_config() {
-        let mut temp = TempSetup::default();
-        let mut fake_path = temp.setup();
-
-        fake_path.push("fake_project.toml");
-
-        if !make_fake_conifg_file(&fake_path) {
-            assert!(false, "failed to make fake config in temp dir");
-        }
-
-        match collect_project_config(&fake_path) {
-            Err(err) => assert!(false, "{} bad toml config", err),
-            Ok(config) => {
-                assert_eq!(
-                    config.dirs.as_ref().unwrap()[0],
-                    String::from("src"),
-                    "did not get the right name"
-                );
-
-                for entry in config.dirs.as_ref().unwrap().iter() {
-                    assert_eq!(entry.is_empty(), false, "no dirs in array");
-                }
-            }
-        };
-    }
+    use crate::test_utils::{make_fake_project, make_fake_project_config};
 
     #[test]
     fn test_new_project() {
@@ -427,18 +346,20 @@ mod test {
             false
         };
 
-        let proj_args = ProjectArgs {
-            root,
-            args,
-            dirs: config.dirs,
-            build: config.build,
+        let project = Project {
             build_first,
+            dirs: config.dirs,
             files: config.files,
+            build: config.build,
             templates: config.templates,
             config_dir_string: config_dir,
+            name: args.name,
+            project_root_path: PathBuf::from(&root),
+            project_root_string: root,
+            dont_make_template: args.dont_make_templates,
+            dont_run_build: args.dont_run_build,
+            show_build_output: args.show_build_output,
         };
-
-        let project = Project::new(proj_args);
 
         assert_eq!(project.name, "test_project");
 

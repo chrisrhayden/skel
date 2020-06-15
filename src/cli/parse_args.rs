@@ -13,6 +13,7 @@ pub struct SkelArgs {
     pub dont_run_build: bool,
     pub dont_make_templates: bool,
     pub build_first: bool,
+    pub show_build_output: bool,
 }
 
 impl SkelArgs {
@@ -26,6 +27,7 @@ impl SkelArgs {
             dont_run_build: false,
             dont_make_templates: false,
             build_first: false,
+            show_build_output: false,
         }
     }
 }
@@ -33,18 +35,6 @@ impl SkelArgs {
 fn get_arg_matches() -> ArgMatches {
     App::new("skel -- a project maker")
         .about("make a project from a toml file")
-        .arg(
-            Arg::with_name("TYPE")
-                .takes_value(true)
-                .required_unless("project file")
-                .help("a project type or alias to make"),
-        )
-        .arg(
-            Arg::with_name("NAME")
-                .takes_value(true)
-                .required(false)
-                .help("the name of the project to make"),
-        )
         .arg(
             Arg::with_name("project file")
                 .short('p')
@@ -86,6 +76,23 @@ fn get_arg_matches() -> ArgMatches {
                 .long("build-first")
                 .help("run the build script before making the rest of the project"),
         )
+        .arg(
+            Arg::with_name("show build output")
+                .short('o')
+                .long("show-build-output")
+                .help("show the output from the build script"),
+        )
+        .arg(
+            Arg::with_name("TYPE")
+                .takes_value(true)
+                .help("a project type or alias to make"),
+        )
+        .arg(
+            Arg::with_name("NAME")
+                .takes_value(true)
+                .required(false)
+                .help("the name of the project to make"),
+        )
         .get_matches()
 }
 
@@ -114,18 +121,20 @@ pub fn parse_args() -> Result<SkelArgs, Box<dyn Error>> {
         skel_args.type_str = project_type
             .map(String::from)
             .expect("cant unwrap project type");
-    } else {
+    } else if project_type.is_none() && project_file.is_none() {
         return Err(Box::from(String::from("bad args")));
     };
 
-    // i some how cant make clap exclusive for -p project_file and type_str
+    // i some how cant make clap exclusive for -p project_file and type_str so
+    // if project_type is present but name is not
+    // then project_type should be name
     if name.is_none() && project_type.is_some() {
         skel_args.name = project_type
             .map(String::from)
             .expect("cant unwrap project type");
     } else if name.is_some() {
         skel_args.name =
-            name.map(String::from).expect("cant unwrap project type");
+            name.map(String::from).expect("cant unwrap project name");
     } else {
         return Err(Box::from(String::from("bad args or bad parsing of args")));
     };
@@ -137,6 +146,7 @@ pub fn parse_args() -> Result<SkelArgs, Box<dyn Error>> {
     skel_args.dont_make_templates = matches.is_present("no templating");
     skel_args.dont_run_build = matches.is_present("no build");
     skel_args.build_first = matches.is_present("run build first");
+    skel_args.show_build_output = matches.is_present("show build output");
 
     Ok(skel_args)
 }

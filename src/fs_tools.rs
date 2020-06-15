@@ -9,7 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{project::Project, skel_error::SkelError};
+use crate::project::Project;
 
 pub fn collect_string_from_file<P>(path: P) -> Result<String, Box<dyn Error>>
 where
@@ -17,16 +17,7 @@ where
 {
     use std::io::Read;
 
-    let mut include_file = match fs::File::open(&path) {
-        // TODO: match the specific error
-        Ok(val) => val,
-        Err(_) => {
-            return Err(Box::from(format!(
-                "missing template include path - {:?}",
-                path
-            )))
-        }
-    };
+    let mut include_file = fs::File::open(&path)?;
 
     let mut buf = String::new();
 
@@ -86,19 +77,18 @@ fn make_project_templates(project: &Project) -> Result<(), Box<dyn Error>> {
 
 ///! the interface for making the project tree
 ///! this will make
-///!     - directory's, (mkdir path/to/dir)
-///!     - blank files (touch path/to/file)
+///!     - directory's, (mkdir -p path/to/dir)
+///!     - blank files (mkdir -p path/to && touch path/to/file)
 ///!     - file templates (echo "$template" > path/to/file)
-///! these functions works like unix's mkdir or touch or cp (for temple's)
-pub fn make_project_tree(project: &Project) -> Result<(), SkelError> {
-    make_project_dirs(project).map_err(SkelError::from_io_err)?;
+pub fn make_project_tree(project: &Project) -> Result<(), Box<dyn Error>> {
+    make_project_dirs(project)?;
 
-    make_project_files(project).map_err(SkelError::from_io_err)?;
+    make_project_files(project)?;
 
     if project.dont_make_template {
         Ok(())
     } else {
-        make_project_templates(project).map_err(SkelError::from_io_err)
+        make_project_templates(project)
     }
 }
 
@@ -113,11 +103,11 @@ mod test {
     #[test]
     fn test_make_project_dirs() {
         let mut temp = TempSetup::default();
-        let root_path: PathBuf = temp.setup();
+        let project_root_path: PathBuf = temp.setup();
 
-        let mut proj = make_fake_project(Some(root_path.clone()));
+        let mut proj = make_fake_project(Some(project_root_path.clone()));
 
-        let mut src = root_path.clone();
+        let mut src = project_root_path.clone();
         src.push("test_project");
         src.push("src");
 
@@ -136,7 +126,7 @@ mod test {
         assert!(src.exists(), "didn't make the root src");
 
         for d in test_dirs {
-            let mut dir_w_root = root_path.clone();
+            let mut dir_w_root = project_root_path.clone();
 
             dir_w_root.push(&proj.name);
             dir_w_root.push(&d);
@@ -154,12 +144,12 @@ mod test {
     #[test]
     fn test_make_project_files() {
         let mut temp = TempSetup::default();
-        let root_path: PathBuf = temp.setup();
+        let project_root_path: PathBuf = temp.setup();
 
         temp.make_fake_project_dirs(None)
             .expect("cant make temp dirs");
 
-        let proj = make_fake_project(Some(root_path.clone()));
+        let proj = make_fake_project(Some(project_root_path.clone()));
 
         // dont bother testing make_project_dirs as that already being done and
         // if it fail then this function should fail
@@ -175,14 +165,14 @@ mod test {
             assert!(false, "make_project_files failed");
         }
 
-        let mut main_f = proj.root_path.clone();
+        let mut main_f = proj.project_root_path.clone();
         main_f.push("src");
         main_f.push("main.rs");
 
         assert!(main_f.exists(), "failed to make src/main.rs");
 
         for f in proj.file_iter().unwrap() {
-            let mut file_w_root = root_path.clone();
+            let mut file_w_root = project_root_path.clone();
 
             file_w_root.push(&proj.name);
             file_w_root.push(&f);

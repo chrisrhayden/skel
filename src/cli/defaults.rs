@@ -1,13 +1,15 @@
-use std::{collections::HashMap, env, error::Error, fs, path::PathBuf};
+use std::{collections::HashMap, env, error::Error, path::PathBuf};
 
 use serde::Deserialize;
 
-use crate::{collect_project_config, template::template, Project, ProjectArgs};
+use crate::{
+    fs_tools::collect_string_from_file, template::template, Project,
+    ProjectConfig,
+};
 
 use super::parse_args::SkelArgs;
 
 pub type SkelResult<T> = Result<T, Box<dyn Error>>;
-pub type UserConfigResult = SkelResult<UserConfig>;
 
 #[derive(Debug, Deserialize)]
 pub struct UserConfig {
@@ -15,11 +17,7 @@ pub struct UserConfig {
     pub alias: HashMap<String, Vec<String>>,
 }
 
-fn make_config_from_toml(config_str: &str) -> UserConfigResult {
-    use std::io::Read;
-
-    let config_path = PathBuf::from(config_str);
-
+fn make_config_from_toml(config_path: &PathBuf) -> SkelResult<UserConfig> {
     if !config_path.exists() {
         return Err(Box::from(format!(
             "config dose not exists -- {}",
@@ -27,71 +25,39 @@ fn make_config_from_toml(config_str: &str) -> UserConfigResult {
         )));
     }
 
-    // TODO: more gracefully hand this
-    let mut conf_file = fs::File::open(&config_path)
-        .expect(&format!("can open file config path {:?}", config_path));
-
-    let mut config_str = String::new();
-
-    conf_file
-        .read_to_string(&mut config_str)
-        .expect("cant read to string");
+    let config_str = collect_string_from_file(&config_path)?;
 
     // TODO: let the user know whats wrong in a nice way
+    // idk, maybe just say bad config with the file name
     let toml_conf = toml::from_str::<UserConfig>(&config_str)
         .expect(&format!("TOML Error -- {}", config_str));
 
     Ok(toml_conf)
 }
 
-// TODO: make the path delimiter and config name variables
-fn config_string_default() -> (String, String) {
-    let mut config_dir = env::var("HOME").expect("home not set");
+fn config_string_default() -> (PathBuf, PathBuf) {
+    let mut config_dir = env::var("HOME")
+        .expect("HOME not set")
+        .parse::<PathBuf>()
+        .expect("cant make path buf from config string");
 
     // first make the directory
-    config_dir.push('/');
-    config_dir.push_str(".config");
-    config_dir.push('/');
-    config_dir.push_str("skel");
+    config_dir.push(".config");
+    config_dir.push("skel");
 
     // then the actual file
     let mut config_file = config_dir.clone();
-    config_file.push('/');
-    config_file.push_str("config.toml");
+    config_file.push("config.toml");
 
     (config_file, config_dir)
 }
 
-fn collect_user_config() -> SkelResult<(UserConfig, String)> {
-    let (u_s, u_d) = config_string_default();
+fn collect_user_config() -> SkelResult<(UserConfig, PathBuf)> {
+    let (config_path, config_dir) = config_string_default();
 
-    let conf = make_config_from_toml(&u_s)?;
+    let conf = make_config_from_toml(&config_path)?;
 
-    Ok((conf, u_d))
-}
-
-fn resolve_user_config(
-    type_str: &str,
-    project_file: Option<&String>,
-) -> Result<(PathBuf, String), Box<dyn Error>> {
-    match project_file {
-        Some(project_file) => {
-            let (_, config_dir_path) = config_string_default();
-
-            Ok((PathBuf::from(project_file), config_dir_path))
-        }
-        None => {
-            let (user_config, config_dir_path) = collect_user_config()?;
-
-            let project_path = project_path_with_templateing(
-                type_str,
-                &user_config,
-                &config_dir_path,
-            )?;
-
-            Ok((project_path, config_dir_path))
-        }
-    }
+    Ok((conf, config_dir))
 }
 
 fn find_project_file(
@@ -122,13 +88,10 @@ fn find_project_file(
 
     match user_config.projects.get(&project_string) {
         Some(val) => Ok(val.to_string()),
-        None => {
-            // this seems unlikely
-            Err(Box::from(format!(
-                "no project for that alias -- {}",
-                type_string
-            )))
-        }
+        None => Err(Box::from(format!(
+            "no project for that alias -- {}",
+            type_string
+        ))),
     }
 }
 
@@ -145,8 +108,59 @@ fn project_path_with_templateing(
     Ok(PathBuf::from(p_string))
 }
 
-fn root_string_default_or(root_from_cli: &Option<String>) -> String {
-    if let Some(from_cli) = root_from_cli {
+fn resolve_user_config(
+    type_str: &str,
+    project_file: Option<&String>,
+) -> SkelResult<(PathBuf, PathBuf)> {
+    match project_file {
+        Some(project_file) => {
+            let (_, config_dir_path) = config_string_default();
+
+            Ok((PathBuf::from(project_file), config_dir_path))
+        }
+        None => {
+            let (user_config, config_dir_path) = collect_user_config()?;
+
+            let project_config_path = project_path_with_templateing(
+                type_str,
+                &user_config,
+                config_dir_path
+                    .to_str()
+                    .as_ref()
+                    .expect("cant get config path str"),
+            )?;
+
+            Ok((project_config_path, config_dir_path))
+        }
+    }
+}
+
+// return a config from a toml file
+pub fn collect_project_config(
+    path: &PathBuf,
+) -> Result<ProjectConfig, Box<dyn Error>> {
+    // return if project path dose not exists
+    if !path.exists() {
+        return Err(Box::from(format!("path given dose exists -- {:?}", path)));
+    }
+
+    let config_string = collect_string_from_file(&path)?;
+
+    let config = match toml::from_str::<ProjectConfig>(&config_string) {
+        Ok(val) => val,
+        Err(err) => {
+            return Err(Box::from(format!(
+                "Toml Error in project file: {}",
+                err
+            )))
+        }
+    };
+
+    Ok(config)
+}
+
+fn resolve_project_root(name: &str, root_from_cli: &Option<String>) -> String {
+    let mut r_string = if let Some(from_cli) = root_from_cli {
         from_cli.to_owned()
     } else {
         // default to current_dir
@@ -155,35 +169,40 @@ fn root_string_default_or(root_from_cli: &Option<String>) -> String {
             .to_str()
             .expect("cant get str from current dir")
             .to_owned()
-    }
+    };
+
+    // set root to the project name not the current_dir
+    // or the one given on the cli
+    // TODO: make this generic for windows maybe
+    r_string.push('/');
+    r_string.push_str(name);
+
+    r_string
 }
 
 // last takes precedent:
 //      default > config > cli config
-// TODO: refactor in to smaller functions
 pub fn resolve_default(args: SkelArgs) -> SkelResult<Project> {
-    let (project_pathbuf, config_dir_path) =
+    let (config_pathbuf, config_dir_path) =
         resolve_user_config(&args.type_str, args.cli_project_file.as_ref())?;
 
-    let mut file_config = collect_project_config(&project_pathbuf)?;
-    let mut root_string = root_string_default_or(&args.different_root);
-    // set root to the project name not the current_dir
-    // or the one given on the cli
-    // TODO: make this generic for windows maybe
-    root_string.push('/');
-    root_string.push_str(&args.name);
+    let mut file_config = collect_project_config(&config_pathbuf)?;
+    let root_string = resolve_project_root(&args.name, &args.different_root);
 
     file_config.resolve_project_templates(
         &root_string,
         &args.name,
-        &config_dir_path,
+        config_dir_path
+            .to_str()
+            .as_ref()
+            .expect("cant unwrap config_dir_path"),
     )?;
 
     if file_config.files.is_none()
         && file_config.dirs.is_none()
         && file_config.build.is_none()
     {
-        return Err(Box::from("project dos not have anything to do"));
+        return Err(Box::from("project dose not have anything to do"));
     }
 
     let build_first = if args.build_first
@@ -195,42 +214,51 @@ pub fn resolve_default(args: SkelArgs) -> SkelResult<Project> {
         false
     };
 
-    let project_args = ProjectArgs {
-        args,
+    let project = Project {
         build_first,
-        root: root_string,
         dirs: file_config.dirs,
         files: file_config.files,
         build: file_config.build,
         templates: file_config.templates,
-        config_dir_string: config_dir_path,
+        config_dir_string: config_dir_path
+            .to_str()
+            .expect("cant get config_dir_path as str")
+            .to_string(),
+        name: args.name,
+        project_root_path: PathBuf::from(&root_string),
+        project_root_string: root_string,
+        dont_make_template: args.dont_make_templates,
+        dont_run_build: args.dont_run_build,
+        show_build_output: args.show_build_output,
     };
 
-    Ok(Project::new(project_args))
+    Ok(project)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-    use crate::test_utils::{make_fake_user_config, TempSetup};
+    use crate::test_utils::{
+        make_fake_conifg_file, make_fake_user_config, TempSetup,
+    };
 
     #[test]
     fn test_config_string_default_or_default() {
         let (test_config_path, test_config_dir) = config_string_default();
 
-        let mut config_dir = env::var("HOME").expect("HOME not set");
+        let mut config_dir = env::var("HOME")
+            .expect("HOME not set")
+            .parse::<PathBuf>()
+            .unwrap();
 
         // first make the directory
-        config_dir.push('/');
-        config_dir.push_str(".config");
-        config_dir.push('/');
-        config_dir.push_str("skel");
+        config_dir.push(".config");
+        config_dir.push("skel");
 
         // then the actual file
         let mut config_file = config_dir.clone();
-        config_file.push('/');
-        config_file.push_str("config.toml");
+        config_file.push("config.toml");
 
         assert_eq!(
             test_config_dir, config_dir,
@@ -317,9 +345,7 @@ mod test {
 
         temp.make_fake_user_config().expect("cant make user config");
 
-        let user_config = match make_config_from_toml(
-            temp_config.to_str().expect("cant get config path"),
-        ) {
+        let user_config = match make_config_from_toml(&temp_config) {
             Err(err) => {
                 assert!(false, "{}", err);
                 unreachable!();
@@ -384,13 +410,15 @@ mod test {
         let type_str = "cpp";
         let user_path = None;
 
-        let mut fake_config = fake_home.to_string();
+        let mut fake_config = fake_home.clone().parse::<PathBuf>().unwrap();
 
-        fake_config.push_str("/.config/skel");
+        fake_config.push(".config");
+        fake_config.push("skel");
 
-        let mut fake_config_file = fake_config.to_string();
+        let mut fake_config_file = fake_config.clone();
 
-        fake_config_file.push_str("/projects/basic_cpp.toml");
+        fake_config_file.push("projects");
+        fake_config_file.push("basic_cpp.toml");
 
         match resolve_user_config(type_str, user_path) {
             Ok((proj_path, proj_dir)) => {
@@ -426,11 +454,39 @@ mod test {
                 );
 
                 assert_eq!(
-                    proj_dir, "/home/test/.config/skel",
+                    proj_dir,
+                    PathBuf::from("/home/test/.config/skel"),
                     "did not make proj_dir right"
                 );
             }
             Err(err) => assert!(false, "Error: {}", err),
+        };
+    }
+
+    #[test]
+    fn test_collect_config() {
+        let mut temp = TempSetup::default();
+        let mut fake_path = temp.setup();
+
+        fake_path.push("fake_project.toml");
+
+        if !make_fake_conifg_file(&fake_path) {
+            assert!(false, "failed to make fake config in temp dir");
+        }
+
+        match collect_project_config(&fake_path) {
+            Err(err) => assert!(false, "{} bad toml config", err),
+            Ok(config) => {
+                assert_eq!(
+                    config.dirs.as_ref().unwrap()[0],
+                    String::from("src"),
+                    "did not get the right name"
+                );
+
+                for entry in config.dirs.as_ref().unwrap().iter() {
+                    assert_eq!(entry.is_empty(), false, "no dirs in array");
+                }
+            }
         };
     }
 }

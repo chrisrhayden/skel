@@ -1,17 +1,16 @@
 short term:
-- refactor skelargs to be useful or get rid of it
-- allow a way to run the build script before trying to do anything else
-- use a templating library
-- add cli arg to show/hide build output
 
 long term:
-- decide how flexible this should be
+- make errors better
+- use a templating library
+- decide how flexible / intricate this should be
     * for one should you be able to make files out side the project dir
     * should i bother with fake root or something for the build script
-- remove template file if not making templates
-- make errors better
+    * maybe come up with a way to point to a directory to recreate
 - make auto complete better
 - maybe add include to build
+- maybe refactor clap logic to be useful or get rid of it
+- allow hiding stderr
 
 test:
 - refactor test suit
@@ -19,10 +18,3 @@ test:
 - make test for cli interface
 - test for failures
     * there are templates that aren't in the file list
-
-done:
-- make SkelInnerError methods for from_io_error
-- check if paths are relative or absolute and to not add / to the name if added
-- add include file to config
-- add a way to not run build script or templates
-- put optional variables back in

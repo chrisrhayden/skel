@@ -7,7 +7,7 @@ use toml;
 
 use crate::{
     cli::{SkelArgs, UserConfig},
-    project::{Project, ProjectArgs, ProjectConfigFile},
+    project::{Project, ProjectConfig},
 };
 
 #[derive(Default)]
@@ -146,10 +146,23 @@ impl Drop for TempSetup {
     }
 }
 
-pub fn make_fake_project_config() -> ProjectConfigFile {
+pub fn make_fake_conifg_file(root: &std::path::Path) -> bool {
+    use std::io::Write;
+
+    let toml_str = make_fake_project_toml();
+    let mut fake_conf = fs::File::create(root).expect("cant make file in temp");
+
+    fake_conf
+        .write_all(toml_str.as_bytes())
+        .expect("cant write to fake toml file");
+
+    true
+}
+
+pub fn make_fake_project_config() -> ProjectConfig {
     let fake_toml = make_fake_project_toml();
 
-    toml::from_str::<ProjectConfigFile>(&fake_toml)
+    toml::from_str::<ProjectConfig>(&fake_toml)
         .expect("cant make config from fake toml")
 }
 
@@ -167,33 +180,38 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
 
     let conf_path_dir = String::from("/tmp/fake_config/");
 
-    let mut conf = make_fake_project_config();
+    let mut config = make_fake_project_config();
 
-    conf.resolve_project_templates(&root, &name, &conf_path_dir)
+    config
+        .resolve_project_templates(&root, &name, &conf_path_dir)
         .expect("cant resolve project templates in make_fake_project");
 
     let args = SkelArgs::make_fake(&name, "fake_type");
 
     let build_first = if args.build_first
-        || (conf.build_first.is_some() && conf.build_first.unwrap())
+        || (config.build_first.is_some() && config.build_first.unwrap())
     {
         true
     } else {
         false
     };
 
-    let p_args = ProjectArgs {
+    let project = Project {
         build_first,
-        build: conf.build,
-        files: conf.files,
-        dirs: conf.dirs,
-        root,
-        args,
-        templates: conf.templates,
+        dirs: config.dirs,
+        files: config.files,
+        build: config.build,
+        templates: config.templates,
         config_dir_string: conf_path_dir,
+        name: args.name,
+        project_root_path: PathBuf::from(&root),
+        project_root_string: root,
+        dont_make_template: args.dont_make_templates,
+        dont_run_build: args.dont_run_build,
+        show_build_output: args.show_build_output,
     };
 
-    Project::new(p_args)
+    project
 }
 
 pub fn make_fake_user_config() -> UserConfig {
