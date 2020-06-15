@@ -1,4 +1,8 @@
-use std::{error::Error, path::PathBuf, process::Command};
+use std::{
+    error::Error,
+    path::PathBuf,
+    process::{Command, Stdio},
+};
 
 use crate::project::Project;
 
@@ -7,7 +11,7 @@ fn make_bash_string(project: &Project) -> String {
     let mut bash_string = project
         .build
         .as_ref()
-        .expect("cant get build script")
+        .expect("cant unwrap build script")
         .to_string();
 
     bash_string.insert_str(0, "#!/usr/bin/env bash\n\n");
@@ -15,40 +19,35 @@ fn make_bash_string(project: &Project) -> String {
     project.run_template(&bash_string)
 }
 
-fn make_cmd(root: &PathBuf, bash_str: &str) -> Command {
-    let mut cmd: Command = Command::new("bash");
+fn make_cmd(root: &PathBuf, bash_str: &str, show_output: bool) -> Command {
+    let mut cmd = Command::new("bash");
 
-    cmd.arg("-c");
-
-    cmd.arg(bash_str);
+    cmd.arg("-c").arg(bash_str);
 
     // only switch dirs if the root has been made
+    // the build script will need to make the directory itself
     if root.exists() {
         cmd.current_dir(root);
+    }
+
+    if !show_output {
+        cmd.stdout(Stdio::null());
     }
 
     cmd
 }
 
-fn run_cmd(show_output: bool, cmd: &mut Command) -> Result<(), Box<dyn Error>> {
-    let output = match cmd.output() {
+fn run_cmd(cmd: &mut Command) -> Result<(), Box<dyn Error>> {
+    let mut cmd_status = match cmd.spawn() {
         Ok(val) => val,
         Err(err) => {
             return Err(Box::from(format!("Bad Command: {}", err)));
         }
     };
 
-    if output.status.success() {
-        if !output.stdout.is_empty() && show_output {
-            print!("{}", String::from_utf8_lossy(&output.stdout));
-        }
-
-        Ok(())
-    } else {
-        Err(Box::from(format!(
-            "Command Error: {}",
-            String::from_utf8_lossy(&output.stderr)
-        )))
+    match cmd_status.wait() {
+        Ok(_) => Ok(()),
+        Err(err) => Err(Box::from(format!("Command Error: {}", err))),
     }
 }
 
@@ -60,9 +59,13 @@ pub fn call_build_script(project: &Project) -> Result<(), Box<dyn Error>> {
 
     let bash_string = make_bash_string(project);
 
-    let mut cmd = make_cmd(&project.project_root_path, &bash_string);
+    let mut cmd = make_cmd(
+        &project.project_root_path,
+        &bash_string,
+        project.show_build_output,
+    );
 
-    run_cmd(project.show_build_output, &mut cmd)
+    run_cmd(&mut cmd)
 }
 
 #[cfg(test)]

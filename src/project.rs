@@ -276,8 +276,6 @@ impl<'a> ProjectTemplateIterator<'a> {
 impl<'a> Iterator for ProjectTemplateIterator<'a> {
     type Item = (PathBuf, String);
 
-    // there should be very little trouble here, maybe do some checks as we take
-    // in data from ProjectConfig
     fn next(&mut self) -> Option<Self::Item> {
         if self.curr >= self.max_len {
             return None;
