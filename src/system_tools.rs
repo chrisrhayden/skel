@@ -30,7 +30,7 @@ fn make_cmd(root: &PathBuf, bash_str: &str) -> Command {
     cmd
 }
 
-fn run_cmd(cmd: &mut Command) -> Result<(), Box<dyn Error>> {
+fn run_cmd(cmd: &mut Command, show_output: bool) -> Result<(), Box<dyn Error>> {
     let output = match cmd.output() {
         Ok(val) => val,
         Err(err) => {
@@ -61,9 +61,9 @@ pub fn call_build_script(project: &Project) -> Result<(), Box<dyn Error>> {
 
     let bash_string = make_bash_string(project);
 
-    let mut cmd = make_cmd(&project.root_path, &bash_string);
+    let mut cmd = make_cmd(&project.project_root_path, &bash_string);
 
-    run_cmd(&mut cmd)
+    run_cmd(&mut cmd, project.show_output)
 }
 
 #[cfg(test)]

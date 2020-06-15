@@ -1,10 +1,12 @@
 short term:
-- refactor skelargs to be useful or get rid of it
-- allow a way to run the build script before trying to do anything else
+- refactor clap logic to be useful or get rid of it
 - use a templating library
 - add cli arg to show/hide build output
+- remove except and unwrap where it is possible
+- refactor all the struct shenanigans
 
 long term:
+- maybe come up with a way to point to a directory to recreate
 - decide how flexible this should be
     * for one should you be able to make files out side the project dir
     * should i bother with fake root or something for the build script
@@ -26,3 +28,5 @@ done:
 - add include file to config
 - add a way to not run build script or templates
 - put optional variables back in
+- allow a way to run the build script before trying to do anything else
+- rename root to project root

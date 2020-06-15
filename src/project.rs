@@ -86,14 +86,15 @@ pub struct Project {
     pub files: Option<Vec<String>>,
     pub build: Option<String>,
     pub templates: Option<Vec<ProjectTemplate>>,
-    pub root_path: PathBuf,
+    pub project_root_path: PathBuf,
     // these are for template slugs
-    pub root_string: String,
+    pub project_root_string: String,
     pub config_dir_string: String,
     // toggles for the build proses
     pub dont_make_template: bool,
     pub dont_run_build: bool,
     pub build_first: bool,
+    pub show_build_output: bool,
 }
 
 impl Project {
@@ -102,8 +103,8 @@ impl Project {
             files: project_args.files,
             dirs: project_args.dirs,
             name: project_args.args.name,
-            root_path: PathBuf::from(&project_args.root),
-            root_string: project_args.root,
+            project_root_path: PathBuf::from(&project_args.root),
+            project_root_string: project_args.root,
             config_dir_string: project_args.config_dir_string,
             build: project_args.build,
             templates: project_args.templates,
@@ -115,7 +116,7 @@ impl Project {
 
     pub fn run_template(&self, to_template: &str) -> String {
         template(
-            &self.root_string,
+            &self.project_root_string,
             &self.name,
             &self.config_dir_string,
             to_template,
@@ -123,14 +124,17 @@ impl Project {
     }
 
     pub fn root_string(&self) -> String {
-        self.root_path
+        self.project_root_path
             .to_str()
             .expect("cant get root string")
             .to_owned()
     }
 
     pub fn dir_iter(&self) -> Option<ProjectPathIterator> {
-        let root = self.root_path.to_str().expect("cant covert path to str");
+        let root = self
+            .project_root_path
+            .to_str()
+            .expect("cant covert path to str");
 
         match self.dirs.as_ref() {
             Some(dirs) => Some(ProjectPathIterator::new(
@@ -144,7 +148,10 @@ impl Project {
     }
 
     pub fn file_iter(&self) -> Option<ProjectPathIterator> {
-        let root = self.root_path.to_str().expect("cant covert path to str");
+        let root = self
+            .project_root_path
+            .to_str()
+            .expect("cant covert path to str");
 
         match self.files.as_ref() {
             Some(files) => Some(ProjectPathIterator::new(
@@ -158,7 +165,10 @@ impl Project {
     }
 
     pub fn template_iter(&self) -> Option<ProjectTemplateIterator> {
-        let root = self.root_path.to_str().expect("cant covert path to str");
+        let root = self
+            .project_root_path
+            .to_str()
+            .expect("cant covert path to str");
 
         match self.templates {
             Some(ref templates) => Some(ProjectTemplateIterator::new(
