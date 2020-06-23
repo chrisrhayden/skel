@@ -21,7 +21,6 @@ impl ProjectConfig {
         name: &str,
         config_dir_path: &str,
     ) -> Result<(), Box<dyn Error>> {
-        // add templates or include files to files list
         if let Some(ref mut temp_files) = self.templates.as_mut() {
             for template_struct in temp_files.iter_mut() {
                 // if the include variable is present force the template to
@@ -318,9 +317,9 @@ impl<'a> Iterator for ProjectTemplateIterator<'a> {
 mod test {
     use super::*;
 
-    use crate::cli::SkelArgs;
-
-    use crate::test_utils::{make_fake_project, make_fake_project_config};
+    use crate::test_utils::{
+        make_fake_project, make_fake_project_config, make_fake_skel_args,
+    };
 
     #[test]
     fn test_new_project() {
@@ -332,7 +331,7 @@ mod test {
 
         let name = String::from("test_project");
 
-        let args = SkelArgs::make_fake(&name, "fake_type");
+        let args = make_fake_skel_args(&name, "fake_type");
 
         config
             .resolve_project_templates(&root, &name, &config_dir)

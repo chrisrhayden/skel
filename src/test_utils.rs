@@ -146,6 +146,20 @@ impl Drop for TempSetup {
     }
 }
 
+pub fn make_fake_skel_args(name: &str, type_str: &str) -> SkelArgs {
+    SkelArgs {
+        name: name.to_owned(),
+        type_str: Some(type_str.to_string()),
+        different_root: None,
+        cli_config_path: None,
+        cli_project_file: None,
+        dont_run_build: false,
+        dont_make_templates: false,
+        build_first: false,
+        show_build_output: false,
+    }
+}
+
 pub fn make_fake_conifg_file(root: &std::path::Path) -> bool {
     use std::io::Write;
 
@@ -186,7 +200,7 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
         .resolve_project_templates(&root, &name, &conf_path_dir)
         .expect("cant resolve project templates in make_fake_project");
 
-    let args = SkelArgs::make_fake(&name, "fake_type");
+    let args = make_fake_skel_args(&name, "fake_type");
 
     let build_first = if args.build_first
         || (config.build_first.is_some() && config.build_first.unwrap())

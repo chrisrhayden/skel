@@ -7,7 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tempfile = "3"
-toml = "0.5"
-serde = { version = "1", features = ["derive"] }
+tempfile = "3.1.0"
+toml = "0.5.6"
+serde = { version = "1.0.113", features = ["derive"] }
 clap = { git = "https://github.com/clap-rs/clap/" }
+liquid = "0.20.1"
