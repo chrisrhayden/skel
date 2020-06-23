@@ -8,7 +8,7 @@ use crate::{
     Project, ProjectConfig,
 };
 
-use super::parse_args::SkelArgs;
+use crate::args::SkelArgs;
 
 pub type SkelResult<T> = Result<T, Box<dyn Error>>;
 
@@ -175,11 +175,11 @@ fn resolve_project_root(name: &str, root_from_cli: Option<String>) -> String {
 
 // last takes precedent:
 //      default > config > cli config
-pub fn resolve_default(mut args: SkelArgs) -> SkelResult<Project> {
+pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Project> {
     let root_string = resolve_project_root(&args.name, args.different_root);
 
     // get the project config and the default skel dir path for templates
-    let (project_path, skel_config_path) =
+    let (project_path, skel_config_path): (String, String) =
         if let Some(project_file) = args.cli_project_file.take() {
             let config_paths = default_skel_config_paths();
 
@@ -238,7 +238,7 @@ mod test {
     };
 
     #[test]
-    fn test_config_string_default_or_default() {
+    fn test_default_skel_config_paths_default_path() {
         let test_config_paths = default_skel_config_paths();
 
         let mut config_dir = env::var("HOME")

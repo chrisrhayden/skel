@@ -46,8 +46,6 @@ fn make_project_files(project: &Project) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-// the files should exist so unless template_iter makes the path wrong
-// everything should be fine by this pint
 fn write_template(
     (template_path, template): (PathBuf, String),
 ) -> Result<(), io::Error> {
@@ -63,13 +61,10 @@ fn write_template(
 }
 
 fn make_project_templates(project: &Project) -> Result<(), Box<dyn Error>> {
-    // it fine to not have templates
-    if project.templates.is_none() {
-        return Ok(());
-    }
-
-    for template in project.template_iter().unwrap() {
-        write_template(template)?;
+    if let Some(template_iter) = project.template_iter() {
+        for template in template_iter {
+            write_template(template)?;
+        }
     }
 
     Ok(())

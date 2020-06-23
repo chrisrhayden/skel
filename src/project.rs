@@ -7,6 +7,13 @@ use crate::{
     template::{template, TemplateArgs},
 };
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct ProjectTemplate {
+    pub path: String,
+    pub template: Option<String>,
+    pub include: Option<String>,
+}
+
 // a config to deserialize project files in toml
 #[derive(Debug, Deserialize)]
 pub struct ProjectConfig {
@@ -18,6 +25,9 @@ pub struct ProjectConfig {
 }
 
 impl ProjectConfig {
+    // this will iterate over all the given template structs and try and add
+    // whatever include point's to, if the include is given the path needs
+    // to exists
     pub fn resolve_project_templates(
         &mut self,
         root_path: &str,
@@ -32,8 +42,6 @@ impl ProjectConfig {
             };
 
             for template_struct in temp_files.iter_mut() {
-                // if the include variable is present force the template to
-                // whatever is in the include path if it exists
                 if let Some(include_str) = template_struct.include.as_ref() {
                     let include_path =
                         PathBuf::from(template(&template_args, include_str));
@@ -55,13 +63,6 @@ impl ProjectConfig {
 
         Ok(())
     }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct ProjectTemplate {
-    pub path: String,
-    pub template: Option<String>,
-    pub include: Option<String>,
 }
 
 ///! A fully resolved and ready to make project
@@ -147,9 +148,6 @@ impl Project {
     }
 }
 
-// an Iterator that takes an array of strings
-// then templates the string and returns a PathBuf
-// TODO: the templating is bad and I feel bad
 pub struct ProjectPathIterator<'a> {
     // an index counter
     curr: usize,
@@ -163,7 +161,6 @@ pub struct ProjectPathIterator<'a> {
 }
 
 impl<'a> ProjectPathIterator<'a> {
-    ///! new takes the template slug keys and the collection to iterate over
     pub fn new(
         template_args: TemplateArgs<'a>,
         array: &'a Vec<String>,
@@ -224,7 +221,6 @@ pub struct ProjectTemplateIterator<'a> {
 }
 
 impl<'a> ProjectTemplateIterator<'a> {
-    ///! new takes the template slug keys and the collection to iterate over
     pub fn new(
         template_args: TemplateArgs<'a>,
         array: &'a [ProjectTemplate],

@@ -7,7 +7,8 @@ use tempfile::{tempdir, TempDir};
 use toml;
 
 use crate::{
-    cli::{SkelArgs, UserConfig},
+    args::SkelArgs,
+    config::UserConfig,
     project::{Project, ProjectConfig},
 };
 

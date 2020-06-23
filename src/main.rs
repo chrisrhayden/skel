@@ -1,6 +1,7 @@
 //! make project layout form a config file
 
-pub mod cli;
+mod args;
+mod config;
 mod fs_tools;
 mod process_tools;
 mod project;
@@ -10,7 +11,6 @@ mod test_utils;
 use std::error::Error;
 
 use crate::{
-    cli::{parse_args, resolve_default},
     fs_tools::make_project_tree,
     process_tools::call_build_script,
     project::{Project, ProjectConfig},
@@ -43,9 +43,9 @@ pub fn make_project(project: &Project) -> Result<(), Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let args = parse_args()?;
+    let args = args::parse_args()?;
 
-    let project = resolve_default(args)?;
+    let project = config::resolve_defaults(args)?;
 
     make_project(&project)
 }
