@@ -1,10 +1,11 @@
-use std::{collections::HashMap, env, error::Error, path::PathBuf};
+use std::{collections::HashMap, env, error::Error, ffi::OsStr, path::PathBuf};
 
 use serde::Deserialize;
 
 use crate::{
-    fs_tools::collect_string_from_file, template::template, Project,
-    ProjectConfig,
+    fs_tools::collect_string_from_file,
+    template::{template, TemplateArgs},
+    Project, ProjectConfig,
 };
 
 use super::parse_args::SkelArgs;
@@ -12,8 +13,8 @@ use super::parse_args::SkelArgs;
 pub type SkelResult<T> = Result<T, Box<dyn Error>>;
 
 struct ConfigPaths {
-    config_file: PathBuf,
-    config_dir: PathBuf,
+    config_file: String,
+    config_dir: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -22,11 +23,15 @@ pub struct UserConfig {
     pub alias: HashMap<String, Vec<String>>,
 }
 
-fn get_user_config(config_path: &PathBuf) -> SkelResult<UserConfig> {
+fn get_user_config<P>(config_path: &P) -> SkelResult<UserConfig>
+where
+    P: AsRef<OsStr> + std::fmt::Debug,
+{
+    let config_path: PathBuf = PathBuf::from(config_path);
     if !config_path.exists() {
         return Err(Box::from(format!(
-            "config dose not exists -- {}",
-            config_path.to_str().expect("cant get root path"),
+            "config dose not exists -- {:?}",
+            config_path,
         )));
     }
 
@@ -40,19 +45,19 @@ fn get_user_config(config_path: &PathBuf) -> SkelResult<UserConfig> {
     Ok(toml_conf)
 }
 
-fn default_config_paths() -> ConfigPaths {
+fn default_skel_config_paths() -> ConfigPaths {
     let mut config_dir = env::var("HOME")
         .expect("HOME not set")
-        .parse::<PathBuf>()
+        .parse::<String>()
         .expect("cant make path buf from config string");
 
     // first make the directory
-    config_dir.push(".config");
-    config_dir.push("skel");
+    config_dir.push_str("/.config");
+    config_dir.push_str("/skel");
 
     // then the actual file
     let mut config_file = config_dir.clone();
-    config_file.push("config.toml");
+    config_file.push_str("/config.toml");
 
     ConfigPaths {
         config_file,
@@ -60,105 +65,95 @@ fn default_config_paths() -> ConfigPaths {
     }
 }
 
-fn collect_user_config() -> SkelResult<(UserConfig, PathBuf)> {
-    let config_paths = default_config_paths();
-
-    let conf = get_user_config(&config_paths.config_file)?;
-
-    Ok((conf, config_paths.config_dir))
-}
-
 fn find_project_file(
     user_config: &UserConfig,
-    type_string: String,
+    alias_string: String,
 ) -> SkelResult<String> {
-    if let Some(path_string) = user_config.projects.get(&type_string) {
+    // if the alias string is an exact project key
+    if let Some(path_string) = user_config.projects.get(&alias_string) {
         return Ok(path_string.clone());
     }
 
-    let mut project_string = String::new();
-
+    // find the project key for the given alias
+    // if found clone it to project_string
     for (project, alias) in user_config.alias.iter() {
-        if alias.contains(&type_string) {
-            project_string.clone_from(project);
-            break;
+        if alias.contains(&alias_string) {
+            let project_config_path =
+                user_config.projects.get(project).map(String::from);
+
+            if let Some(config_path) = project_config_path {
+                return Ok(config_path);
+            } else {
+                return Err(Box::from(format!(
+                    "no project for alias -- {}",
+                    alias_string
+                )));
+            }
         }
     }
 
-    if project_string.is_empty() {
-        return Err(Box::from(format!(
-            "given project type not in user config -- {}",
-            type_string
-        )));
-    }
-
-    match user_config.projects.get(&project_string) {
-        Some(val) => Ok(val.to_string()),
-        None => Err(Box::from(format!(
-            "no project for that alias -- {}",
-            type_string
-        ))),
-    }
+    Err(Box::from(format!(
+        "no given alias in user config -- {}",
+        alias_string
+    )))
 }
 
 fn project_path_with_templateing(
-    type_str: String,
+    alias_str: String,
     user_config: &UserConfig,
     config_dir: &str,
-) -> SkelResult<PathBuf> {
-    let p_string = find_project_file(user_config, type_str)?;
+) -> SkelResult<String> {
+    let p_string = find_project_file(user_config, alias_str)?;
+
+    let template_args = TemplateArgs {
+        root_path: "",
+        project_name: "",
+        skel_config_path: config_dir,
+    };
 
     // this is lame but the only place empty strings are used
-    let p_string = template("", "", &config_dir, &p_string);
-
-    Ok(PathBuf::from(p_string))
+    Ok(template(&template_args, &p_string))
 }
 
-fn resolve_type_config(
-    mut type_string: Option<String>,
-    mut project_file: Option<String>,
-) -> SkelResult<(PathBuf, PathBuf)> {
-    if let Some(project_file) = project_file.take() {
-        let config_paths = default_config_paths();
+fn resolve_project_path(alias_string: String) -> SkelResult<(String, String)> {
+    let config_paths = default_skel_config_paths();
 
-        Ok((PathBuf::from(project_file), config_paths.config_dir))
-    } else if let Some(type_string) = type_string.take() {
-        let (user_config, config_dir_path) = collect_user_config()?;
+    let user_config = get_user_config(&config_paths.config_file)?;
 
-        let project_config_path = project_path_with_templateing(
-            type_string,
-            &user_config,
-            config_dir_path
-                .to_str()
-                .as_ref()
-                .expect("cant get config path str"),
-        )?;
+    let project_config_path = project_path_with_templateing(
+        alias_string,
+        &user_config,
+        &config_paths.config_dir,
+    )?;
 
-        Ok((project_config_path, config_dir_path))
-    } else {
-        Err(Box::from("pleas give ether a project file or type str"))
-    }
+    Ok((project_config_path, config_paths.config_dir))
 }
 
 // return a config from a toml file
-fn get_project_config(path: &PathBuf) -> Result<ProjectConfig, Box<dyn Error>> {
-    if !path.exists() {
+fn get_project_config<P>(
+    project_str: &P,
+) -> Result<ProjectConfig, Box<dyn Error>>
+where
+    P: AsRef<OsStr> + std::fmt::Debug,
+{
+    let project_path = PathBuf::from(project_str);
+
+    if !project_path.exists() {
         return Err(Box::from(format!(
             "path given dose exists -- {}",
-            path.to_str().unwrap()
+            project_path.to_str().unwrap()
         )));
     }
 
-    let config_string = collect_string_from_file(&path)?;
+    let config_string = collect_string_from_file(&project_path)?;
 
-    let config = toml::from_str::<ProjectConfig>(&config_string).expect(
-        &format!("Toml Error in project file - {}", path.to_str().unwrap()),
-    );
+    let config = toml::from_str::<ProjectConfig>(&config_string)
+        .expect(&format!("Toml Error in project file - {:?}", project_str));
 
     Ok(config)
 }
 
-fn resolve_project_root(name: &str, root_from_cli: &Option<String>) -> String {
+fn resolve_project_root(name: &str, root_from_cli: Option<String>) -> String {
     let mut r_string = if let Some(from_cli) = root_from_cli {
         from_cli.to_owned()
     } else {
@@ -172,7 +167,6 @@ fn resolve_project_root(name: &str, root_from_cli: &Option<String>) -> String {
 
     // set root to the project name not the current_dir
     // or the one given on the cli
-    // TODO: make this generic for windows maybe
     r_string.push('/');
     r_string.push_str(name);
 
@@ -181,58 +175,57 @@ fn resolve_project_root(name: &str, root_from_cli: &Option<String>) -> String {
 
 // last takes precedent:
 //      default > config > cli config
-pub fn resolve_default(args: SkelArgs) -> SkelResult<Project> {
-    let (config_pathbuf, config_dir_path) =
-        resolve_type_config(args.type_str, args.cli_project_file)?;
+pub fn resolve_default(mut args: SkelArgs) -> SkelResult<Project> {
+    let root_string = resolve_project_root(&args.name, args.different_root);
 
-    let root_string = resolve_project_root(&args.name, &args.different_root);
+    // get the project config and the default skel dir path for templates
+    let (project_path, skel_config_path) =
+        if let Some(project_file) = args.cli_project_file.take() {
+            let config_paths = default_skel_config_paths();
 
-    let mut file_config = get_project_config(&config_pathbuf)?;
+            (project_file, config_paths.config_dir)
+        } else {
+            resolve_project_path(args.alias_str)?
+        };
 
-    file_config.resolve_project_templates(
+    let mut project_config = get_project_config(&project_path)?;
+
+    project_config.resolve_project_templates(
         &root_string,
         &args.name,
-        config_dir_path
-            .to_str()
-            .as_ref()
-            .expect("cant unwrap config_dir_path"),
+        &skel_config_path,
     )?;
 
-    if file_config.files.is_none()
-        && file_config.dirs.is_none()
-        && file_config.build.is_none()
+    if project_config.files.is_none()
+        && project_config.dirs.is_none()
+        && project_config.build.is_none()
     {
         return Err(Box::from("project dose not have anything to do"));
     }
 
     let build_first = if args.build_first
-        || (file_config.build_first.is_some()
-            && file_config.build_first.unwrap())
+        || (project_config.build_first.is_some()
+            && project_config.build_first.unwrap())
     {
         true
     } else {
         false
     };
 
-    let project = Project {
+    Ok(Project {
         build_first,
-        dirs: file_config.dirs,
-        files: file_config.files,
-        build: file_config.build,
-        templates: file_config.templates,
-        config_dir_string: config_dir_path
-            .to_str()
-            .expect("cant get config_dir_path as str")
-            .to_string(),
+        dirs: project_config.dirs,
+        files: project_config.files,
+        build: project_config.build,
+        templates: project_config.templates,
+        skel_config_path,
         name: args.name,
         project_root_path: PathBuf::from(&root_string),
         project_root_string: root_string,
         dont_make_template: args.dont_make_templates,
         dont_run_build: args.dont_run_build,
         show_build_output: args.show_build_output,
-    };
-
-    Ok(project)
+    })
 }
 
 #[cfg(test)]
@@ -240,25 +233,26 @@ mod test {
     use super::*;
 
     use crate::test_utils::{
-        make_fake_conifg_file, make_fake_user_config, TempSetup,
+        make_fake_conifg_file, make_fake_user_config,
+        make_fake_user_config_no_project, TempSetup,
     };
 
     #[test]
     fn test_config_string_default_or_default() {
-        let test_config_paths = default_config_paths();
+        let test_config_paths = default_skel_config_paths();
 
         let mut config_dir = env::var("HOME")
             .expect("HOME not set")
-            .parse::<PathBuf>()
+            .parse::<String>()
             .unwrap();
 
         // first make the directory
-        config_dir.push(".config");
-        config_dir.push("skel");
+        config_dir.push_str("/.config");
+        config_dir.push_str("/skel");
 
         // then the actual file
         let mut config_file = config_dir.clone();
-        config_file.push("config.toml");
+        config_file.push_str("/config.toml");
 
         assert_eq!(
             test_config_paths.config_dir, config_dir,
@@ -272,7 +266,7 @@ mod test {
     }
 
     #[test]
-    fn test_find_project_file() {
+    fn test_find_project_project_exists() {
         let config = make_fake_user_config();
 
         let project = find_project_file(&config, "cp".to_string());
@@ -308,6 +302,38 @@ mod test {
     }
 
     #[test]
+    fn test_find_project_alias_not_in_config() {
+        let config = make_fake_user_config_no_project();
+
+        let project = find_project_file(&config, "test".to_string());
+
+        assert!(project.is_err(), "project some how exists");
+
+        if let Err(err) = project {
+            match err.to_string().as_str() {
+                "no given alias in user config -- test" => assert!(true),
+                _ => assert!(false, "failed for the wrong reason"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_find_project_project_dose_not_exists() {
+        let config = make_fake_user_config_no_project();
+
+        let project = find_project_file(&config, "cp".to_string());
+
+        assert!(project.is_err(), "project some how exists");
+
+        if let Err(err) = project {
+            match err.to_string().as_str() {
+                "no project for alias -- cp" => assert!(true),
+                _ => assert!(false, "failed for the wrong reason"),
+            }
+        }
+    }
+
+    #[test]
     fn test_project_path_with_templateing() {
         let fake_config_dir = String::from("/tmp/skel");
 
@@ -327,14 +353,13 @@ mod test {
         };
 
         assert_eq!(
-            project_path,
-            PathBuf::from("/tmp/skel/projects/basic_cpp.toml"),
+            project_path, "/tmp/skel/projects/basic_cpp.toml",
             "failed to template path"
         );
     }
 
     #[test]
-    fn test_make_config_from_toml() {
+    fn test_get_user_config_from_toml() {
         let mut temp = TempSetup::default();
         let root = temp.setup();
 
@@ -398,7 +423,7 @@ mod test {
     }
 
     #[test]
-    fn test_resolve_user_config_no_user_path() {
+    fn test_resolve_project_path_no_user_path() {
         let mut temp = TempSetup::default();
         let root = temp.setup();
 
@@ -408,55 +433,27 @@ mod test {
         temp.make_fake_user_config()
             .expect("did not make fake config");
 
-        let type_str = Some("cpp".to_string());
-        let user_path = None;
+        let alias_str = "cpp".to_string();
 
-        let mut fake_config = fake_home.clone().parse::<PathBuf>().unwrap();
+        let mut fake_config = fake_home.clone().parse::<String>().unwrap();
 
-        fake_config.push(".config");
-        fake_config.push("skel");
+        fake_config.push_str("/.config");
+        fake_config.push_str("/skel");
 
         let mut fake_config_file = fake_config.clone();
 
-        fake_config_file.push("projects");
-        fake_config_file.push("basic_cpp.toml");
+        fake_config_file.push_str("/projects");
+        fake_config_file.push_str("/basic_cpp.toml");
 
-        match resolve_type_config(type_str, user_path) {
+        match resolve_project_path(alias_str) {
             Ok((proj_path, proj_dir)) => {
                 assert_eq!(
-                    proj_path,
-                    PathBuf::from(fake_config_file),
+                    proj_path, fake_config_file,
                     "did not find c++ toml file"
                 );
 
                 assert_eq!(
                     proj_dir, fake_config,
-                    "did not make proj_dir right"
-                );
-            }
-            Err(err) => assert!(false, "Error: {}", err),
-        };
-    }
-
-    #[test]
-    fn test_resolve_user_config_user_path_provided() {
-        let type_str = Some("cpp".to_string());
-
-        let user_path_str = String::from("/tmp/skel/projects/cpp.toml");
-
-        env::set_var("HOME", "/home/test");
-
-        match resolve_type_config(type_str, Some(user_path_str)) {
-            Ok((proj_path, proj_dir)) => {
-                assert_eq!(
-                    proj_path,
-                    PathBuf::from("/tmp/skel/projects/cpp.toml"),
-                    "did not find c++ toml file"
-                );
-
-                assert_eq!(
-                    proj_dir,
-                    PathBuf::from("/home/test/.config/skel"),
                     "did not make proj_dir right"
                 );
             }

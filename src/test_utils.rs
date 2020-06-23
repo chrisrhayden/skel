@@ -1,3 +1,4 @@
+#![cfg(test)]
 #![allow(dead_code)]
 use std::{error::Error, fs, path::PathBuf};
 
@@ -146,10 +147,10 @@ impl Drop for TempSetup {
     }
 }
 
-pub fn make_fake_skel_args(name: &str, type_str: &str) -> SkelArgs {
+pub fn make_fake_skel_args(name: &str, alias_str: &str) -> SkelArgs {
     SkelArgs {
         name: name.to_owned(),
-        type_str: Some(type_str.to_string()),
+        alias_str: alias_str.to_string(),
         different_root: None,
         cli_config_path: None,
         cli_project_file: None,
@@ -216,7 +217,7 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
         files: config.files,
         build: config.build,
         templates: config.templates,
-        config_dir_string: conf_path_dir,
+        skel_config_path: conf_path_dir,
         name: args.name,
         project_root_path: PathBuf::from(&root),
         project_root_string: root,
@@ -230,6 +231,19 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
 
 pub fn make_fake_user_config() -> UserConfig {
     let fake_toml = make_fake_user_toml();
+
+    toml::from_str::<UserConfig>(&fake_toml)
+        .expect("did not make user config from toml")
+}
+
+pub fn make_fake_user_config_no_project() -> UserConfig {
+    let fake_toml = r#"
+        [projects]
+        [alias]
+        basic_cpp = ["cpp", "cp", "c++"]
+        basic_javascript = ["js", "j"]
+        basic_python = ["py", "p"]
+        "#;
 
     toml::from_str::<UserConfig>(&fake_toml)
         .expect("did not make user config from toml")

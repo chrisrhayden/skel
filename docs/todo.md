@@ -1,6 +1,8 @@
 # todo
 ## short term
 - pass unused args to the build script
+- make all string path joins use dynamic path char
+- refactor defaults to be more simple
 
 ## long term
 - make errors better
