@@ -13,11 +13,9 @@
     * maybe use a templating library
 - make auto complete better
 - maybe add include for the build script
-- maybe refactor clap logic to be useful or get rid of it
 - allow hiding stderr
 
 ## test
-- refactor test suit
 - make test for optional config variables
 - make test for cli interface
 - test for failures
