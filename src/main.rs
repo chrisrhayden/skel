@@ -1,6 +1,7 @@
 //! make project layout form a config file
 
-pub mod cli;
+mod args;
+mod config;
 mod fs_tools;
 mod process_tools;
 mod project;
@@ -17,7 +18,7 @@ use crate::{
 
 ///! make a new project from a Project struct
 pub fn make_project(project: &Project) -> Result<(), Box<dyn Error>> {
-    // check if something exists at root, root being /path/to/project_name
+    // check if something exists at root
     if project.project_root_path.exists() {
         return Err(Box::from(format!(
             "project destination exists -- {}",
@@ -33,14 +34,20 @@ pub fn make_project(project: &Project) -> Result<(), Box<dyn Error>> {
     // make the project tree
     make_project_tree(project)?;
 
-    // then try and run a build script
+    // then try and run a build script if it wasn't run before
     if !project.build_first && !project.dont_run_build {
         call_build_script(project)?;
     }
 
     Ok(())
+}
 
-    // TODO: maybe a quick test to see of it worked
+fn main() -> Result<(), Box<dyn Error>> {
+    let args = args::parse_args()?;
+
+    let project = config::resolve_defaults(args)?;
+
+    make_project(&project)
 }
 
 #[cfg(test)]

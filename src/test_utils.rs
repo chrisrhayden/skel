@@ -1,3 +1,4 @@
+#![cfg(test)]
 #![allow(dead_code)]
 use std::{error::Error, fs, path::PathBuf};
 
@@ -6,7 +7,8 @@ use tempfile::{tempdir, TempDir};
 use toml;
 
 use crate::{
-    cli::{SkelArgs, UserConfig},
+    args::SkelArgs,
+    config::UserConfig,
     project::{Project, ProjectConfig},
 };
 
@@ -146,6 +148,20 @@ impl Drop for TempSetup {
     }
 }
 
+pub fn make_fake_skel_args(name: &str, alias_str: &str) -> SkelArgs {
+    SkelArgs {
+        name: name.to_owned(),
+        alias_str: alias_str.to_string(),
+        different_root: None,
+        cli_config_path: None,
+        cli_project_file: None,
+        dont_run_build: false,
+        dont_make_templates: false,
+        build_first: false,
+        show_build_output: false,
+    }
+}
+
 pub fn make_fake_conifg_file(root: &std::path::Path) -> bool {
     use std::io::Write;
 
@@ -186,7 +202,7 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
         .resolve_project_templates(&root, &name, &conf_path_dir)
         .expect("cant resolve project templates in make_fake_project");
 
-    let args = SkelArgs::make_fake(&name, "fake_type");
+    let args = make_fake_skel_args(&name, "fake_type");
 
     let build_first = if args.build_first
         || (config.build_first.is_some() && config.build_first.unwrap())
@@ -202,7 +218,7 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
         files: config.files,
         build: config.build,
         templates: config.templates,
-        config_dir_string: conf_path_dir,
+        skel_config_path: conf_path_dir,
         name: args.name,
         project_root_path: PathBuf::from(&root),
         project_root_string: root,
@@ -216,6 +232,19 @@ pub fn make_fake_project(root: Option<PathBuf>) -> Project {
 
 pub fn make_fake_user_config() -> UserConfig {
     let fake_toml = make_fake_user_toml();
+
+    toml::from_str::<UserConfig>(&fake_toml)
+        .expect("did not make user config from toml")
+}
+
+pub fn make_fake_user_config_no_project() -> UserConfig {
+    let fake_toml = r#"
+        [projects]
+        [alias]
+        basic_cpp = ["cpp", "cp", "c++"]
+        basic_javascript = ["js", "j"]
+        basic_python = ["py", "p"]
+        "#;
 
     toml::from_str::<UserConfig>(&fake_toml)
         .expect("did not make user config from toml")

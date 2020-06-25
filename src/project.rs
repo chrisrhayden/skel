@@ -2,7 +2,17 @@ use std::{error::Error, path::PathBuf};
 
 use serde::Deserialize;
 
-use crate::{fs_tools::collect_string_from_file, template::template};
+use crate::{
+    fs_tools::collect_string_from_file,
+    template::{template, TemplateArgs},
+};
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ProjectTemplate {
+    pub path: String,
+    pub template: Option<String>,
+    pub include: Option<String>,
+}
 
 // a config to deserialize project files in toml
 #[derive(Debug, Deserialize)]
@@ -15,24 +25,26 @@ pub struct ProjectConfig {
 }
 
 impl ProjectConfig {
+    // this will iterate over all the given template structs and try and add
+    // whatever include point's to, if the include is given the path needs
+    // to exists
     pub fn resolve_project_templates(
         &mut self,
-        root: &str,
-        name: &str,
-        config_dir_path: &str,
+        root_path: &str,
+        project_name: &str,
+        skel_config_path: &str,
     ) -> Result<(), Box<dyn Error>> {
-        // add templates or include files to files list
         if let Some(ref mut temp_files) = self.templates.as_mut() {
+            let template_args = TemplateArgs {
+                root_path,
+                project_name,
+                skel_config_path,
+            };
+
             for template_struct in temp_files.iter_mut() {
-                // if the include variable is present force the template to
-                // whatever is in the include path if it exists
                 if let Some(include_str) = template_struct.include.as_ref() {
-                    let include_path = PathBuf::from(template(
-                        root,
-                        name,
-                        config_dir_path,
-                        include_str,
-                    ));
+                    let include_path =
+                        PathBuf::from(template(&template_args, include_str));
 
                     let template_string =
                         collect_string_from_file(include_path)?;
@@ -43,7 +55,7 @@ impl ProjectConfig {
                 {
                     return Err(Box::from(format!(
                         "entry dose not have a template -- name {} -- path {}",
-                        name, template_struct.path
+                        project_name, template_struct.path
                     )));
                 }
             }
@@ -51,13 +63,6 @@ impl ProjectConfig {
 
         Ok(())
     }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct ProjectTemplate {
-    pub path: String,
-    pub template: Option<String>,
-    pub include: Option<String>,
 }
 
 ///! A fully resolved and ready to make project
@@ -71,7 +76,7 @@ pub struct Project {
     pub project_root_path: PathBuf,
     // these are for template slugs
     pub project_root_string: String,
-    pub config_dir_string: String,
+    pub skel_config_path: String,
     // toggles for the build proses
     pub dont_make_template: bool,
     pub dont_run_build: bool,
@@ -80,30 +85,14 @@ pub struct Project {
 }
 
 impl Project {
-    // pub fn new(project_args: ProjectArgs) -> Self {
-    //     Self {
-    //         files: project_args.files,
-    //         dirs: project_args.dirs,
-    //         name: project_args.args.name,
-    //         project_root_path: PathBuf::from(&project_args.root),
-    //         project_root_string: project_args.root,
-    //         config_dir_string: project_args.config_dir_string,
-    //         build: project_args.build,
-    //         templates: project_args.templates,
-    //         dont_make_template: project_args.args.dont_make_templates,
-    //         dont_run_build: project_args.args.dont_run_build,
-    //         build_first: project_args.build_first,
-    //         show_build_output: project_args.args.show_build_output,
-    //     }
-    // }
-
     pub fn run_template(&self, to_template: &str) -> String {
-        template(
-            &self.project_root_string,
-            &self.name,
-            &self.config_dir_string,
-            to_template,
-        )
+        let template_args = TemplateArgs {
+            root_path: &self.project_root_string,
+            project_name: &self.name,
+            skel_config_path: &self.skel_config_path,
+        };
+
+        template(&template_args, to_template)
     }
 
     pub fn root_string(&self) -> String {
@@ -114,96 +103,80 @@ impl Project {
     }
 
     pub fn dir_iter(&self) -> Option<ProjectPathIterator> {
-        let root = self
-            .project_root_path
-            .to_str()
-            .expect("cant covert path to str");
-
         match self.dirs.as_ref() {
-            Some(dirs) => Some(ProjectPathIterator::new(
-                root,
-                &self.name,
-                &self.config_dir_string,
-                dirs,
-            )),
+            Some(dirs) => {
+                let template_args = TemplateArgs {
+                    root_path: &self.project_root_string,
+                    skel_config_path: &self.skel_config_path,
+                    project_name: &self.name,
+                };
+
+                Some(ProjectPathIterator::new(template_args, dirs))
+            }
             None => None,
         }
     }
 
     pub fn file_iter(&self) -> Option<ProjectPathIterator> {
-        let root = self
-            .project_root_path
-            .to_str()
-            .expect("cant covert path to str");
-
         match self.files.as_ref() {
-            Some(files) => Some(ProjectPathIterator::new(
-                root,
-                &self.name,
-                &self.config_dir_string,
-                files,
-            )),
+            Some(files) => {
+                let template_args = TemplateArgs {
+                    root_path: &self.project_root_string,
+                    skel_config_path: &self.skel_config_path,
+                    project_name: &self.name,
+                };
+
+                Some(ProjectPathIterator::new(template_args, files))
+            }
             None => None,
         }
     }
 
     pub fn template_iter(&self) -> Option<ProjectTemplateIterator> {
-        let root = self
-            .project_root_path
-            .to_str()
-            .expect("cant covert path to str");
-
         match self.templates {
-            Some(ref templates) => Some(ProjectTemplateIterator::new(
-                root,
-                &self.name,
-                &self.config_dir_string,
-                templates,
-            )),
+            Some(ref templates) => {
+                let template_args = TemplateArgs {
+                    root_path: &self.project_root_string,
+                    skel_config_path: &self.skel_config_path,
+                    project_name: &self.name,
+                };
+
+                Some(ProjectTemplateIterator::new(template_args, templates))
+            }
             None => None,
         }
     }
 }
 
-// an Iterator that takes an array of strings
-// then templates the string and returns a PathBuf
-// TODO: the templating is bad and I feel bad
 pub struct ProjectPathIterator<'a> {
     // an index counter
     curr: usize,
     max_len: usize,
     // from the project struct
-    root: &'a str,
     // to start every path the is not already full / non relative
     root_buf: PathBuf,
     // for templating
-    name: &'a str,
-    conf: &'a str,
     array: &'a Vec<String>,
+    template_args: TemplateArgs<'a>,
 }
 
 impl<'a> ProjectPathIterator<'a> {
-    ///! new takes the template slug keys and the collection to iterate over
     pub fn new(
-        root: &'a str,
-        name: &'a str,
-        conf: &'a str,
+        template_args: TemplateArgs<'a>,
         array: &'a Vec<String>,
     ) -> Self {
         Self {
-            root,
-            conf,
-            root_buf: PathBuf::from(root),
-            name,
+            root_buf: PathBuf::from(template_args.root_path),
             curr: 0,
             max_len: array.len(),
             array,
+            template_args,
         }
     }
 
     // a wrapper to conveniently call this in the iterator
     fn template(&self, source: &str) -> String {
-        template(self.root, self.name, self.conf, source)
+        template(&self.template_args, source)
     }
 }
 
@@ -241,35 +214,28 @@ impl<'a> Iterator for ProjectPathIterator<'a> {
 
 pub struct ProjectTemplateIterator<'a> {
     root_buf: PathBuf,
-    root: &'a str,
-    name: &'a str,
-    conf: &'a str,
     array: &'a [ProjectTemplate],
     max_len: usize,
     curr: usize,
+    template_args: TemplateArgs<'a>,
 }
 
 impl<'a> ProjectTemplateIterator<'a> {
-    ///! new takes the template slug keys and the collection to iterate over
     pub fn new(
-        root: &'a str,
-        name: &'a str,
-        conf: &'a str,
+        template_args: TemplateArgs<'a>,
         array: &'a [ProjectTemplate],
     ) -> Self {
         Self {
-            root,
-            root_buf: PathBuf::from(root),
-            name,
-            conf,
+            root_buf: PathBuf::from(template_args.root_path),
             curr: 0,
             max_len: array.len(),
             array,
+            template_args,
         }
     }
 
     fn template(&self, to_temp: &str) -> String {
-        template(self.root, self.name, self.conf, to_temp)
+        template(&self.template_args, to_temp)
     }
 }
 
@@ -318,9 +284,9 @@ impl<'a> Iterator for ProjectTemplateIterator<'a> {
 mod test {
     use super::*;
 
-    use crate::cli::SkelArgs;
-
-    use crate::test_utils::{make_fake_project, make_fake_project_config};
+    use crate::test_utils::{
+        make_fake_project, make_fake_project_config, make_fake_skel_args,
+    };
 
     #[test]
     fn test_new_project() {
@@ -332,7 +298,7 @@ mod test {
 
         let name = String::from("test_project");
 
-        let args = SkelArgs::make_fake(&name, "fake_type");
+        let args = make_fake_skel_args(&name, "fake_type");
 
         config
             .resolve_project_templates(&root, &name, &config_dir)
@@ -352,7 +318,7 @@ mod test {
             files: config.files,
             build: config.build,
             templates: config.templates,
-            config_dir_string: config_dir,
+            skel_config_path: config_dir,
             name: args.name,
             project_root_path: PathBuf::from(&root),
             project_root_string: root,
