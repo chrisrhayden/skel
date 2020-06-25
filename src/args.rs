@@ -80,46 +80,64 @@ fn get_arg_matches() -> ArgMatches {
          .get_matches()
 }
 
+// check is the right amount of args is given
+// TODO: make clap actually do the semantics of this
+//       or maybe use another lib
+fn project_info_check(
+    project_alias: Option<&str>,
+    project_file: Option<&str>,
+    project_name: Option<&str>,
+) -> Result<(), Box<dyn Error>> {
+    // if they all are present
+    if project_alias.is_some()
+        && project_file.is_some()
+        && project_name.is_some()
+    {
+        Err(Box::from("can not use --project-file with an ALIAS"))
+    // if they all are none
+    } else if project_name.is_none()
+        && project_alias.is_none()
+        && project_file.is_none()
+    {
+        Err(Box::from("to few args given"))
+    // if only an alias is given
+    } else if project_alias.is_some()
+        && (project_file.is_none() && project_name.is_none())
+    {
+        Err(Box::from("to few args given"))
+    } else {
+        Ok(())
+    }
+}
+
 pub fn parse_args() -> Result<SkelArgs, Box<dyn Error>> {
     let matches = get_arg_matches();
 
     let project_alias = matches.value_of("ALIAS");
     let project_file = matches.value_of("project file");
-    let name = matches.value_of("NAME");
+    let project_name = matches.value_of("NAME");
 
-    // TODO: make clap actually do the semantics of this
-    //       or maybe use another lib
-    if project_alias.is_some() && project_file.is_some() && name.is_some() {
-        return Err(Box::from(String::from("to many args given")));
-    } else if name.is_none()
-        && (project_alias.is_none() && project_file.is_none())
-    {
-        return Err(Box::from(String::from("to few args given")));
-    }
+    project_info_check(project_alias, project_file, project_name)?;
 
     let mut skel_args = SkelArgs::default();
 
     if project_alias.is_some() && project_file.is_none() {
         skel_args.alias_str = project_alias
             .map(String::from)
-            .expect("cant unwrap project alias");
-    } else if project_alias.is_none() && project_file.is_none() {
-        return Err(Box::from(String::from("bad args")));
+            .expect("cant unwrap project alias")
     };
 
-    // i some how cant make clap exclusive for -p project_file and alias so
-    // if project_alias is present but name is not
-    // then project_alias should be name
-    if name.is_none() && project_alias.is_some() {
+    // project_info_check should handle all cases that are an error so just keep
+    // it simple here
+    if project_name.is_some() {
+        skel_args.name = project_name
+            .map(String::from)
+            .expect("cant unwrap project name");
+    } else if project_name.is_none() && project_alias.is_some() {
         skel_args.name = project_alias
             .map(String::from)
             .expect("cant unwrap project alias");
-    } else if name.is_some() {
-        skel_args.name =
-            name.map(String::from).expect("cant unwrap project name");
-    } else {
-        return Err(Box::from(String::from("bad args or bad parsing of args")));
-    };
+    }
 
     let different_root = matches.value_of("different root");
     let different_config_path = matches.value_of("different config");
