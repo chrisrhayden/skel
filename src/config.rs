@@ -93,7 +93,7 @@ fn find_project_file(
     }
 
     Err(Box::from(format!(
-        "no given alias in user config -- {}",
+        "no given project for alias in user config -- {}",
         alias_string
     )))
 }
