@@ -2,7 +2,7 @@
 # https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=just-git
 
 pkgname="skel"
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 arch=("x86_64")
 url="https://github.com/chrisrhayden/${pkgname%-git}"
