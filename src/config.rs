@@ -138,9 +138,9 @@ fn resolve_skeleton_path(alias_string: String) -> SkelResult<(String, String)> {
         skel_config_path: &config_paths.config_dir,
     };
 
-    let skeleton_config_path = template(&template_args, &p_string);
+    let skeleton_config_string = template(&template_args, &p_string);
 
-    Ok((skeleton_config_path, config_paths.config_dir))
+    Ok((skeleton_config_string, config_paths.config_dir))
 }
 
 // this will iterate over all the given template structs and try and add
@@ -198,7 +198,9 @@ pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Skeleton> {
             resolve_skeleton_path(args.alias_str)?
         };
 
-    let mut skeleton_config = toml::from_str::<SkeletonConfig>(&skeleton_path)
+    let skeleton_str = string_from_file(&skeleton_path)?;
+
+    let mut skeleton_config: SkeletonConfig = toml::from_str(&skeleton_str)
         .expect(&format!("Toml Error in project file - {}", skeleton_path));
 
     resolve_skeleton_templates(
