@@ -5,7 +5,7 @@ use serde::Deserialize;
 use crate::{
     fs_tools::collect_string_from_file,
     template::{template, TemplateArgs},
-    Project, ProjectConfig,
+    Skeleton, SkeletonConfig,
 };
 
 use crate::args::SkelArgs;
@@ -65,6 +65,15 @@ fn default_skel_config_paths() -> ConfigPaths {
     }
 }
 
+macro_rules! alias_err {
+    ($alias:expr) => {
+        Err(Box::from(format!(
+            "no project for given alias in config -- {}",
+            $alias
+        )));
+    };
+}
+
 fn find_project_file(
     user_config: &UserConfig,
     alias_string: String,
@@ -84,18 +93,12 @@ fn find_project_file(
             if let Some(config_path) = project_config_path {
                 return Ok(config_path);
             } else {
-                return Err(Box::from(format!(
-                    "no project for alias -- {}",
-                    alias_string
-                )));
+                return alias_err!(alias_string);
             }
         }
     }
 
-    Err(Box::from(format!(
-        "no given project for alias in user config -- {}",
-        alias_string
-    )))
+    alias_err!(alias_string)
 }
 
 fn project_path_with_templateing(
@@ -132,7 +135,7 @@ fn resolve_project_path(alias_string: String) -> SkelResult<(String, String)> {
 // return a config from a toml file
 fn get_project_config<P>(
     project_str: &P,
-) -> Result<ProjectConfig, Box<dyn Error>>
+) -> Result<SkeletonConfig, Box<dyn Error>>
 where
     P: AsRef<OsStr> + std::fmt::Debug,
 {
@@ -147,7 +150,7 @@ where
 
     let config_string = collect_string_from_file(&project_path)?;
 
-    let config = toml::from_str::<ProjectConfig>(&config_string)
+    let config = toml::from_str::<SkeletonConfig>(&config_string)
         .expect(&format!("Toml Error in project file - {:?}", project_str));
 
     Ok(config)
@@ -175,7 +178,7 @@ fn resolve_project_root(name: &str, root_from_cli: Option<String>) -> String {
 
 // last takes precedent:
 //      default > config > cli config
-pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Project> {
+pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Skeleton> {
     let root_string = resolve_project_root(&args.name, args.different_root);
 
     // get the project config and the default skel dir path for templates
@@ -190,7 +193,7 @@ pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Project> {
 
     let mut project_config = get_project_config(&project_path)?;
 
-    project_config.resolve_project_templates(
+    project_config.resolve_skeleton_templates(
         &root_string,
         &args.name,
         &skel_config_path,
@@ -212,7 +215,7 @@ pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Project> {
         false
     };
 
-    Ok(Project {
+    Ok(Skeleton {
         build_first,
         dirs: project_config.dirs,
         files: project_config.files,
@@ -234,7 +237,7 @@ mod test {
 
     use crate::test_utils::{
         make_fake_conifg_file, make_fake_user_config,
-        make_fake_user_config_no_project, TempSetup,
+        make_fake_user_config_no_skeleton, TempSetup,
     };
 
     #[test]
@@ -303,33 +306,36 @@ mod test {
 
     #[test]
     fn test_find_project_alias_not_in_config() {
-        let config = make_fake_user_config_no_project();
+        let config = make_fake_user_config_no_skeleton();
 
         let project = find_project_file(&config, "test".to_string());
 
         assert!(project.is_err(), "project some how exists");
 
         if let Err(err) = project {
-            match err.to_string().as_str() {
-                "no given alias in user config -- test" => assert!(true),
-                _ => assert!(false, "failed for the wrong reason"),
-            }
+            println!();
+            assert_eq!(
+                err.to_string().as_str(),
+                "no project for given alias in config -- test",
+                "did not get the right error"
+            );
         }
     }
 
     #[test]
     fn test_find_project_project_dose_not_exists() {
-        let config = make_fake_user_config_no_project();
+        let config = make_fake_user_config_no_skeleton();
 
         let project = find_project_file(&config, "cp".to_string());
 
         assert!(project.is_err(), "project some how exists");
 
         if let Err(err) = project {
-            match err.to_string().as_str() {
-                "no project for alias -- cp" => assert!(true),
-                _ => assert!(false, "failed for the wrong reason"),
-            }
+            assert_eq!(
+                err.to_string().as_str(),
+                "no project for given alias in config -- cp",
+                "failed for the wrong reason"
+            );
         }
     }
 
