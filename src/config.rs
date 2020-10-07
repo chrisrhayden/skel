@@ -207,8 +207,12 @@ pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Skeleton> {
     }
 
     let build_first = args.build_first
-        || (skeleton_config.build_first.is_some()
-            && skeleton_config.build_first.unwrap());
+        || (
+            // make sure there is something before unwrapping
+            skeleton_config.build_first.is_some()
+            // just unwrap and check the inner bool
+            && skeleton_config.build_first.unwrap()
+        );
 
     Ok(Skeleton {
         build_first,
