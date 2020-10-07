@@ -248,13 +248,8 @@ mod test {
 
         let args = make_fake_skel_args(&name, "fake_type");
 
-        let build_first = if args.build_first
-            || (config.build_first.is_some() && config.build_first.unwrap())
-        {
-            true
-        } else {
-            false
-        };
+        let build_first = args.build_first
+            || (config.build_first.is_some() && config.build_first.unwrap());
 
         let skeleton = Skeleton {
             build_first,
