@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env, error::Error, ffi::OsStr, path::PathBuf};
+use std::{collections::HashMap, env, error::Error, path::Path};
 
 use serde::Deserialize;
 
@@ -54,11 +54,9 @@ fn resolve_project_root(name: &str, root_from_cli: Option<String>) -> String {
 
 fn get_user_config<P>(config_path: &P) -> SkelResult<UserConfig>
 where
-    P: AsRef<OsStr> + std::fmt::Debug,
+    P: AsRef<Path>,
 {
-    let config_path: PathBuf = PathBuf::from(config_path);
-
-    let config_str = string_from_file(&config_path)?;
+    let config_str = string_from_file(config_path.as_ref())?;
 
     // TODO: let the user know whats wrong in a nice way
     // idk, maybe just say bad config with the file name
@@ -145,21 +143,6 @@ fn resolve_skeleton_path(alias_string: String) -> SkelResult<(String, String)> {
     Ok((skeleton_config_path, config_paths.config_dir))
 }
 
-// return a config from a toml file
-fn get_skeleton_config<P>(
-    project_str: &P,
-) -> Result<SkeletonConfig, Box<dyn Error>>
-where
-    P: AsRef<OsStr> + std::fmt::Debug,
-{
-    let skeleton_path = PathBuf::from(project_str);
-
-    let config_string = string_from_file(&skeleton_path)?;
-
-    Ok(toml::from_str::<SkeletonConfig>(&config_string)
-        .expect(&format!("Toml Error in project file - {:?}", project_str)))
-}
-
 // this will iterate over all the given template structs and try and add
 // whatever the `include` file contains to the template variables, as of now
 // there is no use in keeping the old templates around i guess
@@ -215,7 +198,8 @@ pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Skeleton> {
             resolve_skeleton_path(args.alias_str)?
         };
 
-    let mut skeleton_config = get_skeleton_config(&skeleton_path)?;
+    let mut skeleton_config = toml::from_str::<SkeletonConfig>(&skeleton_path)
+        .expect(&format!("Toml Error in project file - {}", skeleton_path));
 
     resolve_skeleton_templates(
         &mut skeleton_config,
@@ -261,8 +245,8 @@ mod test {
     use super::*;
 
     use crate::test_utils::{
-        make_fake_conifg_file, make_fake_skeleton_config,
-        make_fake_user_config, make_fake_user_config_no_skeleton, TempSetup,
+        make_fake_skeleton_config, make_fake_user_config,
+        make_fake_user_config_no_skeleton, TempSetup,
     };
 
     #[test]
@@ -464,33 +448,6 @@ mod test {
                 );
             }
             Err(err) => assert!(false, "Error: {}", err),
-        };
-    }
-
-    #[test]
-    fn test_collect_config() {
-        let mut temp = TempSetup::default();
-        let mut fake_path = temp.setup();
-
-        fake_path.push("fake_project.toml");
-
-        if !make_fake_conifg_file(&fake_path) {
-            assert!(false, "failed to make fake config in temp dir");
-        }
-
-        match get_skeleton_config(&fake_path) {
-            Err(err) => assert!(false, "{} bad toml config", err),
-            Ok(config) => {
-                assert_eq!(
-                    config.dirs.as_ref().unwrap()[0],
-                    String::from("src"),
-                    "did not get the right name"
-                );
-
-                for entry in config.dirs.as_ref().unwrap().iter() {
-                    assert_eq!(entry.is_empty(), false, "no dirs in array");
-                }
-            }
         };
     }
 
