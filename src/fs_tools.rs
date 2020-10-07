@@ -20,7 +20,7 @@ where
     let mut include_file = match fs::File::open(&path) {
         Err(err) if err.kind() == ErrorKind::NotFound => {
             return Err(Box::from(format!(
-                "config does not exists -- {:?}",
+                "file does not exists -- {:?}",
                 path,
             )))
         }
