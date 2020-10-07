@@ -73,7 +73,6 @@ pub struct Skeleton {
     pub files: Option<Vec<String>>,
     pub build: Option<String>,
     pub templates: Option<Vec<SkeletonTemplate>>,
-    pub project_root_path: PathBuf,
     // these are for template slugs
     pub project_root_string: String,
     pub skel_config_path: String,
@@ -93,13 +92,6 @@ impl Skeleton {
         };
 
         template(&template_args, to_template)
-    }
-
-    pub fn root_string(&self) -> String {
-        self.project_root_path
-            .to_str()
-            .expect("cant get root string")
-            .to_owned()
     }
 
     pub fn dir_iter(&self) -> Option<SkeletonPathIterator> {
@@ -320,7 +312,6 @@ mod test {
             templates: config.templates,
             skel_config_path: config_dir,
             name: args.name,
-            project_root_path: PathBuf::from(&root),
             project_root_string: root,
             dont_make_template: args.dont_make_templates,
             dont_run_build: args.dont_run_build,

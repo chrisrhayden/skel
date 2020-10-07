@@ -1,6 +1,6 @@
 use std::{
     error::Error,
-    path::PathBuf,
+    path::Path,
     process::{Command, Stdio},
 };
 
@@ -19,14 +19,18 @@ fn make_bash_string(project: &Skeleton) -> String {
     project.run_template(&bash_string)
 }
 
-fn make_cmd(root: &PathBuf, bash_str: &str, show_output: bool) -> Command {
+fn make_cmd<P: AsRef<Path>>(
+    root: P,
+    bash_str: &str,
+    show_output: bool,
+) -> Command {
     let mut cmd = Command::new("bash");
 
     cmd.arg("-c").arg(bash_str);
 
     // only switch dirs if the root has been made
     // the build script will need to make the directory itself
-    if root.exists() {
+    if root.as_ref().exists() {
         cmd.current_dir(root);
     }
 
@@ -60,7 +64,7 @@ pub fn call_build_script(project: &Skeleton) -> Result<(), Box<dyn Error>> {
     let bash_string = make_bash_string(project);
 
     let mut cmd = make_cmd(
-        &project.project_root_path,
+        &project.project_root_string,
         &bash_string,
         project.show_build_output,
     );
@@ -78,7 +82,7 @@ mod test {
 
     #[test]
     fn test_make_bash_string() {
-        let fake_root = Some(PathBuf::from("/tmp/test_root"));
+        let fake_root = Some("/tmp/test_root");
         let proj = make_fake_skeleton(fake_root);
 
         let new_string = make_bash_string(&proj);

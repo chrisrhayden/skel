@@ -218,7 +218,6 @@ pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Skeleton> {
         templates: skeleton_config.templates,
         skel_config_path,
         name: args.name,
-        project_root_path: PathBuf::from(&root_string),
         project_root_string: root_string,
         dont_make_template: args.dont_make_templates,
         dont_run_build: args.dont_run_build,

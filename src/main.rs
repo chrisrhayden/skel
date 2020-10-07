@@ -8,7 +8,7 @@ mod skeleton;
 mod template;
 mod test_utils;
 
-use std::error::Error;
+use std::{error::Error, fs::metadata};
 
 use crate::{fs_tools::make_project_tree, process_tools::call_build_script};
 
@@ -17,10 +17,12 @@ pub use crate::skeleton::{Skeleton, SkeletonConfig};
 ///! make a new project from a Project struct
 pub fn make_project(project: &Skeleton) -> Result<(), Box<dyn Error>> {
     // check if something exists at root
-    if project.project_root_path.exists() {
+    let project_meta = metadata(&project.project_root_string)?;
+
+    if project_meta.is_dir() || project_meta.is_file() {
         return Err(Box::from(format!(
             "project destination exists -- {}",
-            project.root_string()
+            project.project_root_string,
         )));
     }
 
@@ -61,7 +63,8 @@ mod test {
         let mut temp = TempSetup::default();
         let project_root_path: PathBuf = temp.setup();
 
-        let proj = make_fake_skeleton(Some(project_root_path.clone()));
+        let proj =
+            make_fake_skeleton(Some(project_root_path.to_str().unwrap()));
 
         let mut src = project_root_path.clone();
         src.push("test_project");
@@ -73,8 +76,10 @@ mod test {
         }
 
         if let Err(err) = make_project(&proj) {
-            let err_string =
-                format!("project destination exists -- {}", proj.root_string());
+            let err_string = format!(
+                "project destination exists -- {}",
+                proj.project_root_string
+            );
 
             assert_eq!(
                 format!("{}", err),

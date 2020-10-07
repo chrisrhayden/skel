@@ -109,7 +109,8 @@ mod test {
         let mut temp = TempSetup::default();
         let project_root_path: PathBuf = temp.setup();
 
-        let mut proj = make_fake_skeleton(Some(project_root_path.clone()));
+        let mut proj =
+            make_fake_skeleton(Some(project_root_path.to_str().unwrap()));
 
         let mut src = project_root_path.clone();
         src.push("test_project");
@@ -153,7 +154,8 @@ mod test {
         temp.make_fake_skeleton_dirs(None)
             .expect("cant make temp dirs");
 
-        let proj = make_fake_skeleton(Some(project_root_path.clone()));
+        let proj =
+            make_fake_skeleton(Some(project_root_path.to_str().unwrap()));
 
         // dont bother testing make_project_dirs as that already being done and
         // if it fail then this function should fail
@@ -169,7 +171,8 @@ mod test {
             assert!(false, "make_project_files failed");
         }
 
-        let mut main_f = proj.project_root_path.clone();
+        let mut main_f = PathBuf::from(&proj.project_root_string);
+
         main_f.push("src");
         main_f.push("main.rs");
 
@@ -200,7 +203,7 @@ mod test {
         temp.make_fake_skeleton_tree()
             .expect("cant make fake project");
 
-        let proj = make_fake_skeleton(Some(root_buf.clone()));
+        let proj = make_fake_skeleton(Some(root_buf.to_str().unwrap()));
 
         if let Err(err) = make_project_templates(&proj) {
             eprintln!("{}", err);

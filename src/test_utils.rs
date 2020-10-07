@@ -24,7 +24,8 @@ impl TempSetup {
         self.temp = Some(tempdir().unwrap());
         self.root = self.temp.as_ref().unwrap().path().to_owned();
 
-        self.skeleton = Some(make_fake_skeleton(Some(self.root.clone())));
+        self.skeleton =
+            Some(make_fake_skeleton(Some(self.root.to_str().unwrap())));
 
         self.root.clone()
     }
@@ -182,9 +183,9 @@ pub fn make_fake_skeleton_config() -> SkeletonConfig {
         .expect("cant make config from fake toml")
 }
 
-pub fn make_fake_skeleton(root: Option<PathBuf>) -> Skeleton {
+pub fn make_fake_skeleton(root: Option<&str>) -> Skeleton {
     let mut root: String = if let Some(root) = root {
-        String::from(root.to_str().expect("cant get temp path a str"))
+        String::from(root)
     } else {
         String::from("/tmp/test_root")
     };
@@ -215,7 +216,6 @@ pub fn make_fake_skeleton(root: Option<PathBuf>) -> Skeleton {
         templates: config.templates,
         skel_config_path: conf_path_dir,
         name: args.name,
-        project_root_path: PathBuf::from(&root),
         project_root_string: root,
         dont_make_template: args.dont_make_templates,
         dont_run_build: args.dont_run_build,
