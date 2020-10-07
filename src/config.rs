@@ -10,6 +10,12 @@ use crate::{
 
 use crate::args::SkelArgs;
 
+#[cfg(unix)]
+const PATH_DELIMITER: char = '/';
+
+#[cfg(windows)]
+const PATH_DELIMITER: char = '\\';
+
 pub type SkelResult<T> = Result<T, Box<dyn Error>>;
 
 struct ConfigPaths {
@@ -28,12 +34,6 @@ where
     P: AsRef<OsStr> + std::fmt::Debug,
 {
     let config_path: PathBuf = PathBuf::from(config_path);
-    if !config_path.exists() {
-        return Err(Box::from(format!(
-            "config dose not exists -- {:?}",
-            config_path,
-        )));
-    }
 
     let config_str = collect_string_from_file(&config_path)?;
 
@@ -52,26 +52,22 @@ fn default_skel_config_paths() -> ConfigPaths {
         .expect("cant make path buf from config string");
 
     // first make the directory
-    config_dir.push_str("/.config");
-    config_dir.push_str("/skel");
+    config_dir.push(PATH_DELIMITER);
+    config_dir.push_str(".config");
+
+    config_dir.push(PATH_DELIMITER);
+    config_dir.push_str("skel");
 
     // then the actual file
     let mut config_file = config_dir.clone();
-    config_file.push_str("/config.toml");
+
+    config_file.push(PATH_DELIMITER);
+    config_file.push_str("config.toml");
 
     ConfigPaths {
         config_file,
         config_dir,
     }
-}
-
-macro_rules! alias_err {
-    ($alias:expr) => {
-        Err(Box::from(format!(
-            "no project for given alias in config -- {}",
-            $alias
-        )));
-    };
 }
 
 fn find_project_file(
@@ -93,12 +89,18 @@ fn find_project_file(
             if let Some(config_path) = project_config_path {
                 return Ok(config_path);
             } else {
-                return alias_err!(alias_string);
+                return Err(Box::from(format!(
+                    "no project for given alias in config -- {}",
+                    alias_string
+                )));
             }
         }
     }
 
-    alias_err!(alias_string)
+    Err(Box::from(format!(
+        "no project for given alias in config -- {}",
+        alias_string
+    )))
 }
 
 fn project_path_with_templateing(
@@ -108,13 +110,13 @@ fn project_path_with_templateing(
 ) -> SkelResult<String> {
     let p_string = find_project_file(user_config, alias_str)?;
 
+    // this is lame but the only place empty strings are used
     let template_args = TemplateArgs {
         root_path: "",
         project_name: "",
         skel_config_path: config_dir,
     };
 
-    // this is lame but the only place empty strings are used
     Ok(template(&template_args, &p_string))
 }
 
@@ -133,27 +135,25 @@ fn resolve_project_path(alias_string: String) -> SkelResult<(String, String)> {
 }
 
 // return a config from a toml file
-fn get_project_config<P>(
+fn get_skeleton_config<P>(
     project_str: &P,
 ) -> Result<SkeletonConfig, Box<dyn Error>>
 where
     P: AsRef<OsStr> + std::fmt::Debug,
 {
-    let project_path = PathBuf::from(project_str);
+    let skeleton_path = PathBuf::from(project_str);
 
-    if !project_path.exists() {
+    if !skeleton_path.exists() {
         return Err(Box::from(format!(
             "path given dose exists -- {}",
-            project_path.to_str().unwrap()
+            skeleton_path.to_str().unwrap()
         )));
     }
 
-    let config_string = collect_string_from_file(&project_path)?;
+    let config_string = collect_string_from_file(&skeleton_path)?;
 
-    let config = toml::from_str::<SkeletonConfig>(&config_string)
-        .expect(&format!("Toml Error in project file - {:?}", project_str));
-
-    Ok(config)
+    Ok(toml::from_str::<SkeletonConfig>(&config_string)
+        .expect(&format!("Toml Error in project file - {:?}", project_str)))
 }
 
 fn resolve_project_root(name: &str, root_from_cli: Option<String>) -> String {
@@ -170,7 +170,7 @@ fn resolve_project_root(name: &str, root_from_cli: Option<String>) -> String {
 
     // set root to the project name not the current_dir
     // or the one given on the cli
-    r_string.push('/');
+    r_string.push(PATH_DELIMITER);
     r_string.push_str(name);
 
     r_string
@@ -191,36 +191,31 @@ pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Skeleton> {
             resolve_project_path(args.alias_str)?
         };
 
-    let mut project_config = get_project_config(&project_path)?;
+    let mut skeleton_config = get_skeleton_config(&project_path)?;
 
-    project_config.resolve_skeleton_templates(
+    skeleton_config.resolve_skeleton_templates(
         &root_string,
         &args.name,
         &skel_config_path,
     )?;
 
-    if project_config.files.is_none()
-        && project_config.dirs.is_none()
-        && project_config.build.is_none()
+    if skeleton_config.files.is_none()
+        && skeleton_config.dirs.is_none()
+        && skeleton_config.build.is_none()
     {
         return Err(Box::from("project dose not have anything to do"));
     }
 
-    let build_first = if args.build_first
-        || (project_config.build_first.is_some()
-            && project_config.build_first.unwrap())
-    {
-        true
-    } else {
-        false
-    };
+    let build_first = args.build_first
+        || (skeleton_config.build_first.is_some()
+            && skeleton_config.build_first.unwrap());
 
     Ok(Skeleton {
         build_first,
-        dirs: project_config.dirs,
-        files: project_config.files,
-        build: project_config.build,
-        templates: project_config.templates,
+        dirs: skeleton_config.dirs,
+        files: skeleton_config.files,
+        build: skeleton_config.build,
+        templates: skeleton_config.templates,
         skel_config_path,
         name: args.name,
         project_root_path: PathBuf::from(&root_string),
@@ -478,7 +473,7 @@ mod test {
             assert!(false, "failed to make fake config in temp dir");
         }
 
-        match get_project_config(&fake_path) {
+        match get_skeleton_config(&fake_path) {
             Err(err) => assert!(false, "{} bad toml config", err),
             Ok(config) => {
                 assert_eq!(
