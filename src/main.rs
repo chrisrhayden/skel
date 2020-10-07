@@ -16,15 +16,16 @@ pub use crate::skeleton::{Skeleton, SkeletonConfig};
 
 ///! make a new project from a Project struct
 pub fn make_project(project: &Skeleton) -> Result<(), Box<dyn Error>> {
-    // check if something exists at root
-    let project_meta = metadata(&project.project_root_string)?;
-
-    if project_meta.is_dir() || project_meta.is_file() {
-        return Err(Box::from(format!(
-            "project destination exists -- {}",
-            project.project_root_string,
-        )));
-    }
+    match metadata(&project.project_root_string) {
+        // if metadata succeeds then the file exists
+        Ok(_) => {
+            return Err(Box::from(format!(
+                "project destination exists -- {}",
+                project.project_root_string,
+            )))
+        }
+        Err(_) => {}
+    };
 
     // this isn't the worst
     if project.build_first && !project.dont_run_build {
