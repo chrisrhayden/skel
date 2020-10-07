@@ -11,7 +11,7 @@ use std::{
 
 use crate::skeleton::Skeleton;
 
-pub fn collect_string_from_file<P>(path: P) -> Result<String, Box<dyn Error>>
+pub fn string_from_file<P>(path: P) -> Result<String, Box<dyn Error>>
 where
     P: AsRef<Path> + std::fmt::Debug,
 {
