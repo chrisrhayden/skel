@@ -1,14 +1,20 @@
-use std::{collections::HashMap, env, error::Error, ffi::OsStr, path::PathBuf};
+use std::{collections::HashMap, env, error::Error, path::Path};
 
 use serde::Deserialize;
 
 use crate::{
-    fs_tools::collect_string_from_file,
+    fs_tools::string_from_file,
     template::{template, TemplateArgs},
-    Project, ProjectConfig,
+    Skeleton, SkeletonConfig,
 };
 
 use crate::args::SkelArgs;
+
+#[cfg(unix)]
+const PATH_DELIMITER: char = '/';
+
+#[cfg(windows)]
+const PATH_DELIMITER: char = '\\';
 
 pub type SkelResult<T> = Result<T, Box<dyn Error>>;
 
@@ -19,23 +25,38 @@ struct ConfigPaths {
 
 #[derive(Debug, Deserialize)]
 pub struct UserConfig {
-    pub projects: HashMap<String, String>,
+    pub skeletons: HashMap<String, String>,
     pub alias: HashMap<String, Vec<String>>,
+}
+
+// get the root for the users project that the skeleton will be made in to
+fn resolve_project_root(name: &str, root_from_cli: Option<String>) -> String {
+    let mut r_string =
+    // if a root is given at th cli just use that
+    if let Some(from_cli) = root_from_cli {
+        from_cli.to_owned()
+    } else {
+        // default to current_dir
+        env::current_dir()
+            .expect("cant get current_dir")
+            .to_str()
+            .expect("cant get str from current dir")
+            .to_owned()
+    };
+
+    // set root to the project name not the current_dir
+    // or the one given on the cli
+    r_string.push(PATH_DELIMITER);
+    r_string.push_str(name);
+
+    r_string
 }
 
 fn get_user_config<P>(config_path: &P) -> SkelResult<UserConfig>
 where
-    P: AsRef<OsStr> + std::fmt::Debug,
+    P: AsRef<Path>,
 {
-    let config_path: PathBuf = PathBuf::from(config_path);
-    if !config_path.exists() {
-        return Err(Box::from(format!(
-            "config dose not exists -- {:?}",
-            config_path,
-        )));
-    }
-
-    let config_str = collect_string_from_file(&config_path)?;
+    let config_str = string_from_file(config_path.as_ref())?;
 
     // TODO: let the user know whats wrong in a nice way
     // idk, maybe just say bad config with the file name
@@ -52,12 +73,17 @@ fn default_skel_config_paths() -> ConfigPaths {
         .expect("cant make path buf from config string");
 
     // first make the directory
-    config_dir.push_str("/.config");
-    config_dir.push_str("/skel");
+    config_dir.push(PATH_DELIMITER);
+    config_dir.push_str(".config");
+
+    config_dir.push(PATH_DELIMITER);
+    config_dir.push_str("skel");
 
     // then the actual file
     let mut config_file = config_dir.clone();
-    config_file.push_str("/config.toml");
+
+    config_file.push(PATH_DELIMITER);
+    config_file.push_str("config.toml");
 
     ConfigPaths {
         config_file,
@@ -65,27 +91,27 @@ fn default_skel_config_paths() -> ConfigPaths {
     }
 }
 
-fn find_project_file(
+fn find_skeleton_file(
     user_config: &UserConfig,
     alias_string: String,
 ) -> SkelResult<String> {
     // if the alias string is an exact project key
-    if let Some(path_string) = user_config.projects.get(&alias_string) {
+    if let Some(path_string) = user_config.skeletons.get(&alias_string) {
         return Ok(path_string.clone());
     }
 
     // find the project key for the given alias
     // if found clone it to project_string
-    for (project, alias) in user_config.alias.iter() {
+    for (skeleton, alias) in user_config.alias.iter() {
         if alias.contains(&alias_string) {
-            let project_config_path =
-                user_config.projects.get(project).map(String::from);
+            let skeleton_config_path =
+                user_config.skeletons.get(skeleton).map(String::from);
 
-            if let Some(config_path) = project_config_path {
+            if let Some(config_path) = skeleton_config_path {
                 return Ok(config_path);
             } else {
                 return Err(Box::from(format!(
-                    "no project for alias -- {}",
+                    "no skeleton for given alias in config -- {}",
                     alias_string
                 )));
             }
@@ -93,134 +119,120 @@ fn find_project_file(
     }
 
     Err(Box::from(format!(
-        "no given project for alias in user config -- {}",
+        "no skeleton for given alias in config -- {}",
         alias_string
     )))
 }
 
-fn project_path_with_templateing(
-    alias_str: String,
-    user_config: &UserConfig,
-    config_dir: &str,
-) -> SkelResult<String> {
-    let p_string = find_project_file(user_config, alias_str)?;
-
-    let template_args = TemplateArgs {
-        root_path: "",
-        project_name: "",
-        skel_config_path: config_dir,
-    };
-
-    // this is lame but the only place empty strings are used
-    Ok(template(&template_args, &p_string))
-}
-
-fn resolve_project_path(alias_string: String) -> SkelResult<(String, String)> {
+fn resolve_skeleton_path(alias_string: String) -> SkelResult<(String, String)> {
     let config_paths = default_skel_config_paths();
 
     let user_config = get_user_config(&config_paths.config_file)?;
 
-    let project_config_path = project_path_with_templateing(
-        alias_string,
-        &user_config,
-        &config_paths.config_dir,
-    )?;
+    let p_string = find_skeleton_file(&user_config, alias_string)?;
 
-    Ok((project_config_path, config_paths.config_dir))
-}
-
-// return a config from a toml file
-fn get_project_config<P>(
-    project_str: &P,
-) -> Result<ProjectConfig, Box<dyn Error>>
-where
-    P: AsRef<OsStr> + std::fmt::Debug,
-{
-    let project_path = PathBuf::from(project_str);
-
-    if !project_path.exists() {
-        return Err(Box::from(format!(
-            "path given dose exists -- {}",
-            project_path.to_str().unwrap()
-        )));
-    }
-
-    let config_string = collect_string_from_file(&project_path)?;
-
-    let config = toml::from_str::<ProjectConfig>(&config_string)
-        .expect(&format!("Toml Error in project file - {:?}", project_str));
-
-    Ok(config)
-}
-
-fn resolve_project_root(name: &str, root_from_cli: Option<String>) -> String {
-    let mut r_string = if let Some(from_cli) = root_from_cli {
-        from_cli.to_owned()
-    } else {
-        // default to current_dir
-        env::current_dir()
-            .expect("cant get current_dir")
-            .to_str()
-            .expect("cant get str from current dir")
-            .to_owned()
+    // this is lame but the only place empty strings are used
+    let template_args = TemplateArgs {
+        root_path: "",
+        project_name: "",
+        skel_config_path: &config_paths.config_dir,
     };
 
-    // set root to the project name not the current_dir
-    // or the one given on the cli
-    r_string.push('/');
-    r_string.push_str(name);
+    let skeleton_config_path = template(&template_args, &p_string);
 
-    r_string
+    Ok((skeleton_config_path, config_paths.config_dir))
+}
+
+// this will iterate over all the given template structs and try and add
+// whatever the `include` file contains to the template variables, as of now
+// there is no use in keeping the old templates around i guess
+pub fn resolve_skeleton_templates(
+    skel_config: &mut SkeletonConfig,
+    root_path: &str,
+    skeleton_name: &str,
+    skel_config_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    if let Some(ref mut temp_files) = skel_config.templates.as_mut() {
+        let template_args = TemplateArgs {
+            root_path,
+            project_name: skeleton_name,
+            skel_config_path,
+        };
+
+        for template_struct in temp_files.iter_mut() {
+            if let Some(include_str) = template_struct.include.as_ref() {
+                let template_path = template(&template_args, include_str);
+
+                template_struct.template =
+                    Some(string_from_file(template_path)?);
+
+            // if the template exists but does not have a template
+            // string or `include` path
+            } else if template_struct.include.is_none()
+                && template_struct.template.is_none()
+            {
+                return Err(Box::from(format!(
+                    "entry dose not have a template -- name {} -- path {}",
+                    skeleton_name, template_struct.path
+                )));
+            }
+        }
+    }
+
+    Ok(())
 }
 
 // last takes precedent:
 //      default > config > cli config
-pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Project> {
+pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Skeleton> {
+    // get the root path to make a skeleton in to
     let root_string = resolve_project_root(&args.name, args.different_root);
 
-    // get the project config and the default skel dir path for templates
-    let (project_path, skel_config_path): (String, String) =
-        if let Some(project_file) = args.cli_project_file.take() {
+    // get the skeleton config and the default skel dir path for templates
+    let (skeleton_path, skel_config_path): (String, String) =
+        if let Some(skeleton_file) = args.cli_project_file.take() {
             let config_paths = default_skel_config_paths();
 
-            (project_file, config_paths.config_dir)
+            (skeleton_file, config_paths.config_dir)
         } else {
-            resolve_project_path(args.alias_str)?
+            resolve_skeleton_path(args.alias_str)?
         };
 
-    let mut project_config = get_project_config(&project_path)?;
+    let mut skeleton_config = toml::from_str::<SkeletonConfig>(&skeleton_path)
+        .expect(&format!("Toml Error in project file - {}", skeleton_path));
 
-    project_config.resolve_project_templates(
+    resolve_skeleton_templates(
+        &mut skeleton_config,
         &root_string,
         &args.name,
         &skel_config_path,
     )?;
 
-    if project_config.files.is_none()
-        && project_config.dirs.is_none()
-        && project_config.build.is_none()
+    if skeleton_config.files.is_none()
+        && skeleton_config.dirs.is_none()
+        && skeleton_config.build.is_none()
     {
         return Err(Box::from("project dose not have anything to do"));
     }
 
-    let build_first = if args.build_first
-        || (project_config.build_first.is_some()
-            && project_config.build_first.unwrap())
-    {
-        true
-    } else {
-        false
-    };
+    let build_first =
+        // cli overrides everything
+        args.build_first
+        || (
+            // make sure there is something before unwrapping
+            skeleton_config.build_first.is_some()
+            // just unwrap and check the inner bool
+            && skeleton_config.build_first.unwrap()
+        );
 
-    Ok(Project {
+    Ok(Skeleton {
         build_first,
-        dirs: project_config.dirs,
-        files: project_config.files,
-        build: project_config.build,
-        templates: project_config.templates,
         skel_config_path,
         name: args.name,
-        project_root_path: PathBuf::from(&root_string),
+        dirs: skeleton_config.dirs,
+        files: skeleton_config.files,
+        build: skeleton_config.build,
+        templates: skeleton_config.templates,
         project_root_string: root_string,
         dont_make_template: args.dont_make_templates,
         dont_run_build: args.dont_run_build,
@@ -233,8 +245,8 @@ mod test {
     use super::*;
 
     use crate::test_utils::{
-        make_fake_conifg_file, make_fake_user_config,
-        make_fake_user_config_no_project, TempSetup,
+        make_fake_skeleton_config, make_fake_user_config,
+        make_fake_user_config_no_skeleton, TempSetup,
     };
 
     #[test]
@@ -269,7 +281,7 @@ mod test {
     fn test_find_project_project_exists() {
         let config = make_fake_user_config();
 
-        let project = find_project_file(&config, "cp".to_string());
+        let project = find_skeleton_file(&config, "cp".to_string());
 
         assert!(project.is_ok(), "failed to find project to make");
 
@@ -279,7 +291,7 @@ mod test {
             "failed to find project to make"
         );
 
-        let project = find_project_file(&config, "p".to_string());
+        let project = find_skeleton_file(&config, "p".to_string());
 
         assert!(project.is_ok(), "failed to find project to make");
 
@@ -290,7 +302,7 @@ mod test {
         );
 
         let project =
-            find_project_file(&config, "basic_javascript".to_string());
+            find_skeleton_file(&config, "basic_javascript".to_string());
 
         assert!(project.is_ok(), "failed to find project to make");
 
@@ -303,59 +315,37 @@ mod test {
 
     #[test]
     fn test_find_project_alias_not_in_config() {
-        let config = make_fake_user_config_no_project();
+        let config = make_fake_user_config_no_skeleton();
 
-        let project = find_project_file(&config, "test".to_string());
+        let project = find_skeleton_file(&config, "test".to_string());
 
         assert!(project.is_err(), "project some how exists");
 
         if let Err(err) = project {
-            match err.to_string().as_str() {
-                "no given alias in user config -- test" => assert!(true),
-                _ => assert!(false, "failed for the wrong reason"),
-            }
+            println!();
+            assert_eq!(
+                err.to_string().as_str(),
+                "no skeleton for given alias in config -- test",
+                "did not get the right error"
+            );
         }
     }
 
     #[test]
     fn test_find_project_project_dose_not_exists() {
-        let config = make_fake_user_config_no_project();
+        let config = make_fake_user_config_no_skeleton();
 
-        let project = find_project_file(&config, "cp".to_string());
+        let project = find_skeleton_file(&config, "cp".to_string());
 
         assert!(project.is_err(), "project some how exists");
 
         if let Err(err) = project {
-            match err.to_string().as_str() {
-                "no project for alias -- cp" => assert!(true),
-                _ => assert!(false, "failed for the wrong reason"),
-            }
+            assert_eq!(
+                err.to_string().as_str(),
+                "no skeleton for given alias in config -- cp",
+                "failed for the wrong reason"
+            );
         }
-    }
-
-    #[test]
-    fn test_project_path_with_templateing() {
-        let fake_config_dir = String::from("/tmp/skel");
-
-        let conf = make_fake_user_config();
-
-        let project_path = match project_path_with_templateing(
-            "cp".to_string(),
-            &conf,
-            &fake_config_dir,
-        ) {
-            Err(err) => {
-                assert!(false, "{}", err);
-                // or just return
-                unreachable!();
-            }
-            Ok(val) => val,
-        };
-
-        assert_eq!(
-            project_path, "/tmp/skel/projects/basic_cpp.toml",
-            "failed to template path"
-        );
     }
 
     #[test]
@@ -395,7 +385,7 @@ mod test {
         );
 
         assert_eq!(
-            user_config.projects, projects,
+            user_config.skeletons, projects,
             "failsed to make user config projects"
         );
 
@@ -423,7 +413,7 @@ mod test {
     }
 
     #[test]
-    fn test_resolve_project_path_no_user_path() {
+    fn test_resolve_skeleton_path_no_user_path() {
         let mut temp = TempSetup::default();
         let root = temp.setup();
 
@@ -445,7 +435,7 @@ mod test {
         fake_config_file.push_str("/projects");
         fake_config_file.push_str("/basic_cpp.toml");
 
-        match resolve_project_path(alias_str) {
+        match resolve_skeleton_path(alias_str) {
             Ok((proj_path, proj_dir)) => {
                 assert_eq!(
                     proj_path, fake_config_file,
@@ -462,29 +452,84 @@ mod test {
     }
 
     #[test]
-    fn test_collect_config() {
-        let mut temp = TempSetup::default();
-        let mut fake_path = temp.setup();
+    fn test_resolve_skeleton_templates_no_include_file() {
+        let mut setup = TempSetup::default();
+        let root = setup.setup();
 
-        fake_path.push("fake_project.toml");
+        let root_str = root.to_str().expect("cant get root as str");
 
-        if !make_fake_conifg_file(&fake_path) {
-            assert!(false, "failed to make fake config in temp dir");
+        let mut skel_config = make_fake_skeleton_config();
+
+        let mut config_dir = root.clone();
+
+        config_dir.push(".config");
+        config_dir.push("skel");
+
+        let resolve_result = resolve_skeleton_templates(
+            &mut skel_config,
+            root_str,
+            "test_project",
+            config_dir.to_str().unwrap(),
+        );
+
+        assert!(
+            resolve_result.is_err(),
+            "resolve_skeleton_templates some how got include file"
+        );
+    }
+
+    #[test]
+    fn test_resolve_skeleton_templates_include_file_exits() {
+        use std::{fs, io::Write};
+
+        let mut setup = TempSetup::default();
+        let root = setup.setup();
+
+        let root_str = root.to_str().expect("cant get root as str");
+
+        let mut skel_config = make_fake_skeleton_config();
+
+        let mut config_dir = root.clone();
+
+        config_dir.push(".config");
+        config_dir.push("skel");
+
+        fs::create_dir_all(&config_dir).expect("cant make config dir");
+
+        let mut fake_text = config_dir.clone();
+
+        fake_text.push("test_include.txt");
+
+        let mut text_file =
+            fs::File::create(fake_text).expect("cant open include file");
+
+        text_file
+            .write_all(b"test include {{name}}")
+            .expect("cant write to file");
+
+        let resolve_result = resolve_skeleton_templates(
+            &mut skel_config,
+            root_str,
+            "test_project",
+            config_dir.to_str().unwrap(),
+        );
+
+        if let Err(err) = resolve_result {
+            assert!(
+                false,
+                "resolve_skeleton_templates returned with and error: {}",
+                err
+            );
         }
 
-        match get_project_config(&fake_path) {
-            Err(err) => assert!(false, "{} bad toml config", err),
-            Ok(config) => {
-                assert_eq!(
-                    config.dirs.as_ref().unwrap()[0],
-                    String::from("src"),
-                    "did not get the right name"
+        for temp in skel_config.templates.unwrap() {
+            if &temp.path == "src/test_include.txt" {
+                let temp_str = temp.template.unwrap();
+                assert!(
+                    temp_str.starts_with("test include"),
+                    "did not get the template file"
                 );
-
-                for entry in config.dirs.as_ref().unwrap().iter() {
-                    assert_eq!(entry.is_empty(), false, "no dirs in array");
-                }
             }
-        };
+        }
     }
 }

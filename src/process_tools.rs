@@ -1,12 +1,12 @@
 use std::{
     error::Error,
-    path::PathBuf,
+    path::Path,
     process::{Command, Stdio},
 };
 
-use crate::project::Project;
+use crate::skeleton::Skeleton;
 
-fn make_bash_string(project: &Project) -> String {
+fn make_bash_string(project: &Skeleton) -> String {
     // project.build should always exist because this is only run if it dose
     let mut bash_string = project
         .build
@@ -19,14 +19,18 @@ fn make_bash_string(project: &Project) -> String {
     project.run_template(&bash_string)
 }
 
-fn make_cmd(root: &PathBuf, bash_str: &str, show_output: bool) -> Command {
+fn make_cmd<P: AsRef<Path>>(
+    root: P,
+    bash_str: &str,
+    show_output: bool,
+) -> Command {
     let mut cmd = Command::new("bash");
 
     cmd.arg("-c").arg(bash_str);
 
     // only switch dirs if the root has been made
     // the build script will need to make the directory itself
-    if root.exists() {
+    if root.as_ref().exists() {
         cmd.current_dir(root);
     }
 
@@ -38,20 +42,20 @@ fn make_cmd(root: &PathBuf, bash_str: &str, show_output: bool) -> Command {
 }
 
 fn run_cmd(cmd: &mut Command) -> Result<(), Box<dyn Error>> {
-    let mut cmd_status = match cmd.spawn() {
+    let mut running_cmd = match cmd.spawn() {
         Ok(val) => val,
         Err(err) => {
             return Err(Box::from(format!("Bad Command: {}", err)));
         }
     };
 
-    match cmd_status.wait() {
+    match running_cmd.wait() {
         Ok(_) => Ok(()),
         Err(err) => Err(Box::from(format!("Command Error: {}", err))),
     }
 }
 
-pub fn call_build_script(project: &Project) -> Result<(), Box<dyn Error>> {
+pub fn call_build_script(project: &Skeleton) -> Result<(), Box<dyn Error>> {
     // if no build script present then just return
     if project.build.is_none() {
         return Ok(());
@@ -60,7 +64,7 @@ pub fn call_build_script(project: &Project) -> Result<(), Box<dyn Error>> {
     let bash_string = make_bash_string(project);
 
     let mut cmd = make_cmd(
-        &project.project_root_path,
+        &project.project_root_string,
         &bash_string,
         project.show_build_output,
     );
@@ -72,14 +76,14 @@ pub fn call_build_script(project: &Project) -> Result<(), Box<dyn Error>> {
 mod test {
     use super::*;
 
-    use crate::test_utils::make_fake_project;
+    use crate::test_utils::make_fake_skeleton;
 
     // TODO: test if the cmd was made correctly or if ran correctly, but idk how
 
     #[test]
     fn test_make_bash_string() {
-        let fake_root = Some(PathBuf::from("/tmp/test_root"));
-        let proj = make_fake_project(fake_root);
+        let fake_root = Some("/tmp/test_root");
+        let proj = make_fake_skeleton(fake_root);
 
         let new_string = make_bash_string(&proj);
         let hand_made = String::from(

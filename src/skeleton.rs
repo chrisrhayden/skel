@@ -1,79 +1,34 @@
-use std::{error::Error, path::PathBuf};
+use std::path::PathBuf;
 
 use serde::Deserialize;
 
-use crate::{
-    fs_tools::collect_string_from_file,
-    template::{template, TemplateArgs},
-};
+use crate::template::{template, TemplateArgs};
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct ProjectTemplate {
+pub struct SkeletonTemplate {
     pub path: String,
     pub template: Option<String>,
     pub include: Option<String>,
 }
 
-// a config to deserialize project files in toml
+// a config to deserialize skeleton files in toml
 #[derive(Debug, Deserialize)]
-pub struct ProjectConfig {
+pub struct SkeletonConfig {
     pub dirs: Option<Vec<String>>,
     pub files: Option<Vec<String>>,
     pub build: Option<String>,
     pub build_first: Option<bool>,
-    pub templates: Option<Vec<ProjectTemplate>>,
+    pub templates: Option<Vec<SkeletonTemplate>>,
 }
 
-impl ProjectConfig {
-    // this will iterate over all the given template structs and try and add
-    // whatever include point's to, if the include is given the path needs
-    // to exists
-    pub fn resolve_project_templates(
-        &mut self,
-        root_path: &str,
-        project_name: &str,
-        skel_config_path: &str,
-    ) -> Result<(), Box<dyn Error>> {
-        if let Some(ref mut temp_files) = self.templates.as_mut() {
-            let template_args = TemplateArgs {
-                root_path,
-                project_name,
-                skel_config_path,
-            };
-
-            for template_struct in temp_files.iter_mut() {
-                if let Some(include_str) = template_struct.include.as_ref() {
-                    let include_path =
-                        PathBuf::from(template(&template_args, include_str));
-
-                    let template_string =
-                        collect_string_from_file(include_path)?;
-
-                    template_struct.template = Some(template_string);
-                } else if template_struct.include.is_none()
-                    && template_struct.template.is_none()
-                {
-                    return Err(Box::from(format!(
-                        "entry dose not have a template -- name {} -- path {}",
-                        project_name, template_struct.path
-                    )));
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
-
-///! A fully resolved and ready to make project
+///! A fully resolved and ready to make skeleton
 #[derive(Debug)]
-pub struct Project {
+pub struct Skeleton {
     pub name: String,
     pub dirs: Option<Vec<String>>,
     pub files: Option<Vec<String>>,
     pub build: Option<String>,
-    pub templates: Option<Vec<ProjectTemplate>>,
-    pub project_root_path: PathBuf,
+    pub templates: Option<Vec<SkeletonTemplate>>,
     // these are for template slugs
     pub project_root_string: String,
     pub skel_config_path: String,
@@ -84,7 +39,7 @@ pub struct Project {
     pub show_build_output: bool,
 }
 
-impl Project {
+impl Skeleton {
     pub fn run_template(&self, to_template: &str) -> String {
         let template_args = TemplateArgs {
             root_path: &self.project_root_string,
@@ -95,14 +50,7 @@ impl Project {
         template(&template_args, to_template)
     }
 
-    pub fn root_string(&self) -> String {
-        self.project_root_path
-            .to_str()
-            .expect("cant get root string")
-            .to_owned()
-    }
-
-    pub fn dir_iter(&self) -> Option<ProjectPathIterator> {
+    pub fn dir_iter(&self) -> Option<SkeletonPathIterator> {
         match self.dirs.as_ref() {
             Some(dirs) => {
                 let template_args = TemplateArgs {
@@ -111,13 +59,13 @@ impl Project {
                     project_name: &self.name,
                 };
 
-                Some(ProjectPathIterator::new(template_args, dirs))
+                Some(SkeletonPathIterator::new(template_args, dirs))
             }
             None => None,
         }
     }
 
-    pub fn file_iter(&self) -> Option<ProjectPathIterator> {
+    pub fn file_iter(&self) -> Option<SkeletonPathIterator> {
         match self.files.as_ref() {
             Some(files) => {
                 let template_args = TemplateArgs {
@@ -126,13 +74,13 @@ impl Project {
                     project_name: &self.name,
                 };
 
-                Some(ProjectPathIterator::new(template_args, files))
+                Some(SkeletonPathIterator::new(template_args, files))
             }
             None => None,
         }
     }
 
-    pub fn template_iter(&self) -> Option<ProjectTemplateIterator> {
+    pub fn template_iter(&self) -> Option<SkeletonTemplateIterator> {
         match self.templates {
             Some(ref templates) => {
                 let template_args = TemplateArgs {
@@ -141,18 +89,18 @@ impl Project {
                     project_name: &self.name,
                 };
 
-                Some(ProjectTemplateIterator::new(template_args, templates))
+                Some(SkeletonTemplateIterator::new(template_args, templates))
             }
             None => None,
         }
     }
 }
 
-pub struct ProjectPathIterator<'a> {
+pub struct SkeletonPathIterator<'a> {
     // an index counter
     curr: usize,
     max_len: usize,
-    // from the project struct
+    // from the skeleton struct
     // to start every path the is not already full / non relative
     root_buf: PathBuf,
     // for templating
@@ -160,7 +108,7 @@ pub struct ProjectPathIterator<'a> {
     template_args: TemplateArgs<'a>,
 }
 
-impl<'a> ProjectPathIterator<'a> {
+impl<'a> SkeletonPathIterator<'a> {
     pub fn new(
         template_args: TemplateArgs<'a>,
         array: &'a Vec<String>,
@@ -180,7 +128,7 @@ impl<'a> ProjectPathIterator<'a> {
     }
 }
 
-impl<'a> Iterator for ProjectPathIterator<'a> {
+impl<'a> Iterator for SkeletonPathIterator<'a> {
     type Item = PathBuf;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -212,18 +160,18 @@ impl<'a> Iterator for ProjectPathIterator<'a> {
     }
 }
 
-pub struct ProjectTemplateIterator<'a> {
+pub struct SkeletonTemplateIterator<'a> {
     root_buf: PathBuf,
-    array: &'a [ProjectTemplate],
+    array: &'a [SkeletonTemplate],
     max_len: usize,
     curr: usize,
     template_args: TemplateArgs<'a>,
 }
 
-impl<'a> ProjectTemplateIterator<'a> {
+impl<'a> SkeletonTemplateIterator<'a> {
     pub fn new(
         template_args: TemplateArgs<'a>,
-        array: &'a [ProjectTemplate],
+        array: &'a [SkeletonTemplate],
     ) -> Self {
         Self {
             root_buf: PathBuf::from(template_args.root_path),
@@ -239,7 +187,7 @@ impl<'a> ProjectTemplateIterator<'a> {
     }
 }
 
-impl<'a> Iterator for ProjectTemplateIterator<'a> {
+impl<'a> Iterator for SkeletonTemplateIterator<'a> {
     type Item = (PathBuf, String);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -285,12 +233,12 @@ mod test {
     use super::*;
 
     use crate::test_utils::{
-        make_fake_project, make_fake_project_config, make_fake_skel_args,
+        make_fake_skel_args, make_fake_skeleton, make_fake_skeleton_config,
     };
 
     #[test]
-    fn test_new_project() {
-        let mut config = make_fake_project_config();
+    fn test_new_skeleton() {
+        let config = make_fake_skeleton_config();
 
         let config_dir = String::from("/tmp/fake_config/config.toml");
 
@@ -300,19 +248,10 @@ mod test {
 
         let args = make_fake_skel_args(&name, "fake_type");
 
-        config
-            .resolve_project_templates(&root, &name, &config_dir)
-            .expect("cant resolve templates");
+        let build_first = args.build_first
+            || (config.build_first.is_some() && config.build_first.unwrap());
 
-        let build_first = if args.build_first
-            || (config.build_first.is_some() && config.build_first.unwrap())
-        {
-            true
-        } else {
-            false
-        };
-
-        let project = Project {
+        let skeleton = Skeleton {
             build_first,
             dirs: config.dirs,
             files: config.files,
@@ -320,18 +259,17 @@ mod test {
             templates: config.templates,
             skel_config_path: config_dir,
             name: args.name,
-            project_root_path: PathBuf::from(&root),
             project_root_string: root,
             dont_make_template: args.dont_make_templates,
             dont_run_build: args.dont_run_build,
             show_build_output: args.show_build_output,
         };
 
-        assert_eq!(project.name, "test_project");
+        assert_eq!(skeleton.name, "test_project");
 
         let test_dirs = ["src", "tests", "tests/more_tests"];
 
-        for d in project.dirs.unwrap() {
+        for d in skeleton.dirs.unwrap() {
             if !test_dirs.contains(&d.as_str()) {
                 assert!(false, "{} -- bad test dir found", d);
             }
@@ -340,7 +278,7 @@ mod test {
         let test_files =
             ["src/main.rs", "tests/test_main.rs", "src/test_include.txt"];
 
-        for f in project.files.unwrap() {
+        for f in skeleton.files.unwrap() {
             if !test_files.contains(&f.as_str()) {
                 assert!(false, "{} -- bad test files found", f);
             }
@@ -351,8 +289,8 @@ mod test {
     }
 
     #[test]
-    fn test_dirs_project_buf_iter() {
-        let proj = make_fake_project(None);
+    fn test_dirs_skeleton_buf_iter() {
+        let proj = make_fake_skeleton(None);
 
         let mut dir_iter = proj.dir_iter().unwrap();
 
@@ -382,8 +320,8 @@ mod test {
     }
 
     #[test]
-    fn test_files_project_buf_iter() {
-        let proj = make_fake_project(None);
+    fn test_files_skeleton_buf_iter() {
+        let proj = make_fake_skeleton(None);
 
         let mut file_iter = proj.file_iter().unwrap();
 
@@ -406,7 +344,7 @@ mod test {
 
     #[test]
     fn test_config_template_iter() {
-        let proj = make_fake_project(None);
+        let proj = make_fake_skeleton(None);
 
         let mut template_iter =
             proj.template_iter().expect("cant get template iter");
@@ -440,7 +378,7 @@ mod test {
 
     #[test]
     fn test_config_template_iter_no_files() {
-        let mut proj = make_fake_project(None);
+        let mut proj = make_fake_skeleton(None);
 
         proj.files.take();
 
