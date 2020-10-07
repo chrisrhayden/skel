@@ -228,7 +228,7 @@ pub fn make_fake_user_config() -> UserConfig {
 
 pub fn make_fake_user_config_no_skeleton() -> UserConfig {
     let fake_toml = r#"
-        [projects]
+        [skeletons]
         [alias]
         basic_cpp = ["cpp", "cp", "c++"]
         basic_javascript = ["js", "j"]
@@ -243,7 +243,7 @@ pub fn make_fake_user_toml() -> String {
     r#"
 # the paths to the projects
 # {{config-dir}} will correspond to ~/.config/skel
-[projects]
+[skeletons]
 basic_cpp = "{{config-dir}}/projects/basic_cpp.toml"
 basic_javascript = "{{config-dir}}/projects/basic_javascript.toml"
 basic_python = "{{config-dir}}/projects/basic_python.toml"
