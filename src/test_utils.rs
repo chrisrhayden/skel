@@ -197,11 +197,7 @@ pub fn make_fake_skeleton(root: Option<&str>) -> Skeleton {
 
     let conf_path_dir = String::from("/tmp/fake_config/");
 
-    let mut config = make_fake_skeleton_config();
-
-    config
-        .resolve_skeleton_templates(&root, &name, &conf_path_dir)
-        .expect("cant resolve project templates in make_fake_project");
+    let config = make_fake_skeleton_config();
 
     let args = make_fake_skel_args(&name, "fake_type");
 
@@ -292,7 +288,7 @@ template = "// no tests yet for {{name}}"
 
 [[templates]]
 path = "src/test_include.txt"
-include = "docs/test_include.txt"
+include = "{{config-dir}}/test_include.txt"
 "#
     .to_string()
 }

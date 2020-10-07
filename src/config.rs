@@ -3,7 +3,7 @@ use std::{collections::HashMap, env, error::Error, ffi::OsStr, path::PathBuf};
 use serde::Deserialize;
 
 use crate::{
-    fs_tools::collect_string_from_file,
+    fs_tools::string_from_file,
     template::{template, TemplateArgs},
     Skeleton, SkeletonConfig,
 };
@@ -35,7 +35,7 @@ where
 {
     let config_path: PathBuf = PathBuf::from(config_path);
 
-    let config_str = collect_string_from_file(&config_path)?;
+    let config_str = string_from_file(&config_path)?;
 
     // TODO: let the user know whats wrong in a nice way
     // idk, maybe just say bad config with the file name
@@ -150,7 +150,7 @@ where
         )));
     }
 
-    let config_string = collect_string_from_file(&skeleton_path)?;
+    let config_string = string_from_file(&skeleton_path)?;
 
     Ok(toml::from_str::<SkeletonConfig>(&config_string)
         .expect(&format!("Toml Error in project file - {:?}", project_str)))
@@ -176,6 +176,45 @@ fn resolve_project_root(name: &str, root_from_cli: Option<String>) -> String {
     r_string
 }
 
+// this will iterate over all the given template structs and try and add
+// whatever the `include` file contains to the template variables, as of now
+// there is no use in keeping the old templates around i guess
+pub fn resolve_skeleton_templates(
+    skel_config: &mut SkeletonConfig,
+    root_path: &str,
+    skeleton_name: &str,
+    skel_config_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    if let Some(ref mut temp_files) = skel_config.templates.as_mut() {
+        let template_args = TemplateArgs {
+            root_path,
+            project_name: skeleton_name,
+            skel_config_path,
+        };
+
+        for template_struct in temp_files.iter_mut() {
+            if let Some(include_str) = template_struct.include.as_ref() {
+                let template_path = template(&template_args, include_str);
+
+                template_struct.template =
+                    Some(string_from_file(template_path)?);
+
+            // if the template exists but does not have a template
+            // string or `include` path
+            } else if template_struct.include.is_none()
+                && template_struct.template.is_none()
+            {
+                return Err(Box::from(format!(
+                    "entry dose not have a template -- name {} -- path {}",
+                    skeleton_name, template_struct.path
+                )));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 // last takes precedent:
 //      default > config > cli config
 pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Skeleton> {
@@ -193,7 +232,8 @@ pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Skeleton> {
 
     let mut skeleton_config = get_skeleton_config(&project_path)?;
 
-    skeleton_config.resolve_skeleton_templates(
+    resolve_skeleton_templates(
+        &mut skeleton_config,
         &root_string,
         &args.name,
         &skel_config_path,
@@ -234,8 +274,8 @@ mod test {
     use super::*;
 
     use crate::test_utils::{
-        make_fake_conifg_file, make_fake_user_config,
-        make_fake_user_config_no_skeleton, TempSetup,
+        make_fake_conifg_file, make_fake_skeleton_config,
+        make_fake_user_config, make_fake_user_config_no_skeleton, TempSetup,
     };
 
     #[test]
@@ -490,5 +530,87 @@ mod test {
                 }
             }
         };
+    }
+
+    #[test]
+    fn test_resolve_skeleton_templates_no_include_file() {
+        let mut setup = TempSetup::default();
+        let root = setup.setup();
+
+        let root_str = root.to_str().expect("cant get root as str");
+
+        let mut skel_config = make_fake_skeleton_config();
+
+        let mut config_dir = root.clone();
+
+        config_dir.push(".config");
+        config_dir.push("skel");
+
+        let resolve_result = resolve_skeleton_templates(
+            &mut skel_config,
+            root_str,
+            "test_project",
+            config_dir.to_str().unwrap(),
+        );
+
+        assert!(
+            resolve_result.is_err(),
+            "resolve_skeleton_templates some how got include file"
+        );
+    }
+
+    #[test]
+    fn test_resolve_skeleton_templates_include_file_exits() {
+        use std::{fs, io::Write};
+
+        let mut setup = TempSetup::default();
+        let root = setup.setup();
+
+        let root_str = root.to_str().expect("cant get root as str");
+
+        let mut skel_config = make_fake_skeleton_config();
+
+        let mut config_dir = root.clone();
+
+        config_dir.push(".config");
+        config_dir.push("skel");
+
+        fs::create_dir_all(&config_dir).expect("cant make config dir");
+
+        let mut fake_text = config_dir.clone();
+
+        fake_text.push("test_include.txt");
+
+        let mut text_file =
+            fs::File::create(fake_text).expect("cant open include file");
+
+        text_file
+            .write_all(b"test include {{name}}")
+            .expect("cant write to file");
+
+        let resolve_result = resolve_skeleton_templates(
+            &mut skel_config,
+            root_str,
+            "test_project",
+            config_dir.to_str().unwrap(),
+        );
+
+        if let Err(err) = resolve_result {
+            assert!(
+                false,
+                "resolve_skeleton_templates returned with and error: {}",
+                err
+            );
+        }
+
+        for temp in skel_config.templates.unwrap() {
+            if &temp.path == "src/test_include.txt" {
+                let temp_str = temp.template.unwrap();
+                assert!(
+                    temp_str.starts_with("test include"),
+                    "did not get the template file"
+                );
+            }
+        }
     }
 }

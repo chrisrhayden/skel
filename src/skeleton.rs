@@ -1,11 +1,8 @@
-use std::{error::Error, path::PathBuf};
+use std::path::PathBuf;
 
 use serde::Deserialize;
 
-use crate::{
-    fs_tools::collect_string_from_file,
-    template::{template, TemplateArgs},
-};
+use crate::template::{template, TemplateArgs};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SkeletonTemplate {
@@ -22,47 +19,6 @@ pub struct SkeletonConfig {
     pub build: Option<String>,
     pub build_first: Option<bool>,
     pub templates: Option<Vec<SkeletonTemplate>>,
-}
-
-impl SkeletonConfig {
-    // this will iterate over all the given template structs and try and add
-    // whatever include point's to, if the include is given the path needs
-    // to exists
-    pub fn resolve_skeleton_templates(
-        &mut self,
-        root_path: &str,
-        skeleton_name: &str,
-        skel_config_path: &str,
-    ) -> Result<(), Box<dyn Error>> {
-        if let Some(ref mut temp_files) = self.templates.as_mut() {
-            let template_args = TemplateArgs {
-                root_path,
-                project_name: skeleton_name,
-                skel_config_path,
-            };
-
-            for template_struct in temp_files.iter_mut() {
-                if let Some(include_str) = template_struct.include.as_ref() {
-                    let include_path =
-                        PathBuf::from(template(&template_args, include_str));
-
-                    let template_string =
-                        collect_string_from_file(include_path)?;
-
-                    template_struct.template = Some(template_string);
-                } else if template_struct.include.is_none()
-                    && template_struct.template.is_none()
-                {
-                    return Err(Box::from(format!(
-                        "entry dose not have a template -- name {} -- path {}",
-                        skeleton_name, template_struct.path
-                    )));
-                }
-            }
-        }
-
-        Ok(())
-    }
 }
 
 ///! A fully resolved and ready to make skeleton
@@ -282,7 +238,7 @@ mod test {
 
     #[test]
     fn test_new_skeleton() {
-        let mut config = make_fake_skeleton_config();
+        let config = make_fake_skeleton_config();
 
         let config_dir = String::from("/tmp/fake_config/config.toml");
 
@@ -291,10 +247,6 @@ mod test {
         let name = String::from("test_project");
 
         let args = make_fake_skel_args(&name, "fake_type");
-
-        config
-            .resolve_skeleton_templates(&root, &name, &config_dir)
-            .expect("cant resolve templates");
 
         let build_first = if args.build_first
             || (config.build_first.is_some() && config.build_first.unwrap())
