@@ -29,6 +29,29 @@ pub struct UserConfig {
     pub alias: HashMap<String, Vec<String>>,
 }
 
+// get the root for the users project that the skeleton will be made in to
+fn resolve_project_root(name: &str, root_from_cli: Option<String>) -> String {
+    let mut r_string =
+    // if a root is given at th cli just use that
+    if let Some(from_cli) = root_from_cli {
+        from_cli.to_owned()
+    } else {
+        // default to current_dir
+        env::current_dir()
+            .expect("cant get current_dir")
+            .to_str()
+            .expect("cant get str from current dir")
+            .to_owned()
+    };
+
+    // set root to the project name not the current_dir
+    // or the one given on the cli
+    r_string.push(PATH_DELIMITER);
+    r_string.push_str(name);
+
+    r_string
+}
+
 fn get_user_config<P>(config_path: &P) -> SkelResult<UserConfig>
 where
     P: AsRef<OsStr> + std::fmt::Debug,
@@ -137,26 +160,6 @@ where
         .expect(&format!("Toml Error in project file - {:?}", project_str)))
 }
 
-fn resolve_project_root(name: &str, root_from_cli: Option<String>) -> String {
-    let mut r_string = if let Some(from_cli) = root_from_cli {
-        from_cli.to_owned()
-    } else {
-        // default to current_dir
-        env::current_dir()
-            .expect("cant get current_dir")
-            .to_str()
-            .expect("cant get str from current dir")
-            .to_owned()
-    };
-
-    // set root to the project name not the current_dir
-    // or the one given on the cli
-    r_string.push(PATH_DELIMITER);
-    r_string.push_str(name);
-
-    r_string
-}
-
 // this will iterate over all the given template structs and try and add
 // whatever the `include` file contains to the template variables, as of now
 // there is no use in keeping the old templates around i guess
@@ -199,9 +202,10 @@ pub fn resolve_skeleton_templates(
 // last takes precedent:
 //      default > config > cli config
 pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Skeleton> {
+    // get the root path to make a skeleton in to
     let root_string = resolve_project_root(&args.name, args.different_root);
 
-    // get the project config and the default skel dir path for templates
+    // get the skeleton config and the default skel dir path for templates
     let (skeleton_path, skel_config_path): (String, String) =
         if let Some(skeleton_file) = args.cli_project_file.take() {
             let config_paths = default_skel_config_paths();
@@ -227,7 +231,9 @@ pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Skeleton> {
         return Err(Box::from("project dose not have anything to do"));
     }
 
-    let build_first = args.build_first
+    let build_first =
+        // cli overrides everything
+        args.build_first
         || (
             // make sure there is something before unwrapping
             skeleton_config.build_first.is_some()
