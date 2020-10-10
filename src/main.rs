@@ -16,16 +16,13 @@ pub use crate::skeleton::{Skeleton, SkeletonConfig};
 
 ///! make a new project from a Project struct
 pub fn make_project(project: &Skeleton) -> Result<(), Box<dyn Error>> {
-    match metadata(&project.project_root_string) {
+    if metadata(&project.project_root_string).is_ok() {
         // if metadata succeeds then the file exists
-        Ok(_) => {
-            return Err(Box::from(format!(
-                "project destination exists -- {}",
-                project.project_root_string,
-            )))
-        }
-        Err(_) => {}
-    };
+        return Err(Box::from(format!(
+            "project destination exists -- {}",
+            project.project_root_string,
+        )));
+    }
 
     // this isn't the worst
     if project.build_first && !project.dont_run_build {
@@ -67,13 +64,13 @@ mod test {
         let proj =
             make_fake_skeleton(Some(project_root_path.to_str().unwrap()));
 
-        let mut src = project_root_path.clone();
+        let mut src = project_root_path;
         src.push("test_project");
         src.push("src");
 
         if let Err(err) = fs::create_dir_all(&src) {
             eprintln!("{}", err);
-            assert!(false, "something is fucked");
+            panic!("something is fucked");
         }
 
         if let Err(err) = make_project(&proj) {
@@ -88,9 +85,7 @@ mod test {
                 "did not find project path"
             );
         } else {
-            assert!(false, "did not fail");
+            panic!("did not fail");
         };
-
-        assert!(true);
     }
 }

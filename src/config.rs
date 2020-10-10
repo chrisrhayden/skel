@@ -34,7 +34,7 @@ fn resolve_project_root(name: &str, root_from_cli: Option<String>) -> String {
     let mut r_string =
     // if a root is given at th cli just use that
     if let Some(from_cli) = root_from_cli {
-        from_cli.to_owned()
+        from_cli
     } else {
         // default to current_dir
         env::current_dir()
@@ -61,7 +61,7 @@ where
     // TODO: let the user know whats wrong in a nice way
     // idk, maybe just say bad config with the file name
     let toml_conf = toml::from_str::<UserConfig>(&config_str)
-        .expect(&format!("TOML Error -- {}", config_str));
+        .unwrap_or_else(|_| panic!("TOML Error -- {}", config_str));
 
     Ok(toml_conf)
 }
@@ -201,7 +201,9 @@ pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Skeleton> {
     let skeleton_str = string_from_file(&skeleton_path)?;
 
     let mut skeleton_config: SkeletonConfig = toml::from_str(&skeleton_str)
-        .expect(&format!("Toml Error in project file - {}", skeleton_path));
+        .unwrap_or_else(|_| {
+            panic!("Toml Error in project file - {}", skeleton_path)
+        });
 
     resolve_skeleton_templates(
         &mut skeleton_config,
@@ -355,7 +357,7 @@ mod test {
         let mut temp = TempSetup::default();
         let root = temp.setup();
 
-        let mut temp_config = root.clone();
+        let mut temp_config = root;
 
         temp_config.push(".config");
         temp_config.push("skel");
@@ -420,6 +422,7 @@ mod test {
         let root = temp.setup();
 
         let fake_home = root.to_str().unwrap();
+
         env::set_var("HOME", fake_home);
 
         temp.make_fake_user_config()
@@ -427,7 +430,7 @@ mod test {
 
         let alias_str = "cpp".to_string();
 
-        let mut fake_config = fake_home.clone().parse::<String>().unwrap();
+        let mut fake_config = root.to_str().unwrap().parse::<String>().unwrap();
 
         fake_config.push_str("/.config");
         fake_config.push_str("/skel");

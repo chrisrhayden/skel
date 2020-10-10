@@ -101,10 +101,6 @@ fn project_info_check(
     {
         Err(Box::from("to few args given"))
     // if only an alias is given
-    } else if project_alias.is_some()
-        && (project_file.is_none() && project_name.is_none())
-    {
-        Err(Box::from("to few args given"))
     } else {
         Ok(())
     }

@@ -104,15 +104,12 @@ pub struct SkeletonPathIterator<'a> {
     // to start every path the is not already full / non relative
     root_buf: PathBuf,
     // for templating
-    array: &'a Vec<String>,
+    array: &'a [String],
     template_args: TemplateArgs<'a>,
 }
 
 impl<'a> SkeletonPathIterator<'a> {
-    pub fn new(
-        template_args: TemplateArgs<'a>,
-        array: &'a Vec<String>,
-    ) -> Self {
+    pub fn new(template_args: TemplateArgs<'a>, array: &'a [String]) -> Self {
         Self {
             root_buf: PathBuf::from(template_args.root_path),
             curr: 0,
@@ -283,9 +280,6 @@ mod test {
                 assert!(false, "{} -- bad test files found", f);
             }
         }
-
-        // make this test explicitly pass
-        assert!(true);
     }
 
     #[test]
@@ -315,8 +309,6 @@ mod test {
         );
 
         assert_eq!(dir_iter.next(), None, "too many in dirs vector");
-
-        assert!(true);
     }
 
     #[test]
@@ -338,8 +330,6 @@ mod test {
             )),
             "test_main.rs not in project struct"
         );
-
-        assert!(true);
     }
 
     #[test]
