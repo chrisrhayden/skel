@@ -2,7 +2,8 @@
 ## short term
 - pass unused args to the build script
 - make all string path joins use dynamic path char
-- refactor defaults to be more simple
+- add the location / why the errors happened, like is it a template file that
+  cant be found
 
 ## long term
 - make errors better
@@ -14,6 +15,7 @@
 - make auto complete better
 - maybe add include for the build script
 - allow hiding stderr
+- refactor defaults to be more simple
 
 ## test
 - make test for optional config variables
