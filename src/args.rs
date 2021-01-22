@@ -16,12 +16,12 @@ pub struct SkelArgs {
     pub show_build_output: bool,
 }
 
-fn get_arg_matches() -> ArgMatches {
+fn get_arg_matches<'a>() -> ArgMatches<'a> {
     App::new("skel -- a project maker")
          .about("make a project from a toml file")
          .arg(
              Arg::with_name("project file")
-                 .short('p')
+                 .short("p")
                  .long("project-file")
                  .value_name("FILE")
                  .takes_value(true)
@@ -29,40 +29,40 @@ fn get_arg_matches() -> ArgMatches {
          )
          .arg(
              Arg::with_name("different root")
-                 .short('r')
+                 .short("r")
                  .long("different-root")
                  .value_name("PATH")
                  .help("use PATH as root inserted of current dir"),
          )
          .arg(
              Arg::with_name("different config")
-                 .short('c')
+                 .short("c")
                  .long("different-config")
                  .value_name("FILE")
                  .help("use FILE instead of the default config file"),
          )
          .arg(
              Arg::with_name("no build")
-                 .short('n')
+                 .short("n")
                  .long("no-build")
                  .takes_value(false)
                  .help("dont run the build script"),
          )
          .arg(
              Arg::with_name("no templating")
-                 .short('N')
+                 .short("N")
                  .long("no-templating")
                  .help("dont make templates"),
          )
          .arg(
              Arg::with_name("run build first")
-                 .short('b')
+                 .short("b")
                  .long("build-first")
                  .help("run the build script before making the rest of the project"),
          )
          .arg(
              Arg::with_name("show build output")
-                 .short('o')
+                 .short("o")
                  .long("show-build-output")
                  .help("show the output from the build script"),
          )
