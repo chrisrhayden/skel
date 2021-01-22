@@ -1,5 +1,4 @@
-//! make project layout form a config file
-
+/// make project layout form a config file
 mod args;
 mod config;
 mod fs_tools;
@@ -14,7 +13,7 @@ use crate::{fs_tools::make_project_tree, process_tools::call_build_script};
 
 pub use crate::skeleton::{Skeleton, SkeletonConfig};
 
-///! make a new project from a Project struct
+/// make a new project from a Project struct
 pub fn make_project(project: &Skeleton) -> Result<(), Box<dyn Error>> {
     if metadata(&project.project_root_string).is_ok() {
         // if metadata succeeds then the file exists

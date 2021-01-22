@@ -79,11 +79,11 @@ fn make_project_templates(project: &Skeleton) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-///! the interface for making the project tree
-///! this will make
-///!     - directory's, (mkdir -p path/to/dir)
-///!     - blank files (mkdir -p path/to && touch path/to/file)
-///!     - file templates (echo "$template" > path/to/file)
+/// the interface for making the project tree
+/// this will make
+///     - directory's, (mkdir -p path/to/dir)
+///     - blank files (mkdir -p path/to && touch path/to/file)
+///     - file templates (echo "$template" > path/to/file)
 pub fn make_project_tree(project: &Skeleton) -> Result<(), Box<dyn Error>> {
     make_project_dirs(project)?;
 
@@ -125,7 +125,7 @@ mod test {
         if let Err(err) = make_project_dirs(&proj) {
             eprintln!("{}", err);
 
-            assert!(false, "make_project_dirs failed");
+            panic!("make_project_dirs failed");
         }
 
         assert!(src.exists(), "didn't make the root src");
@@ -142,8 +142,6 @@ mod test {
                 dir_w_root
             );
         }
-
-        assert!(true);
     }
 
     #[test]
@@ -162,13 +160,13 @@ mod test {
         if let Err(err) = make_project_dirs(&proj) {
             eprintln!("{}", err);
 
-            assert!(false, "make_project_dirs failed");
+            panic!("make_project_dirs failed");
         }
 
         if let Err(err) = make_project_files(&proj) {
             eprintln!("{}", err);
 
-            assert!(false, "make_project_files failed");
+            panic!("make_project_files failed");
         }
 
         let mut main_f = PathBuf::from(&proj.project_root_string);
@@ -207,7 +205,7 @@ mod test {
 
         if let Err(err) = make_project_templates(&proj) {
             eprintln!("{}", err);
-            assert!(false, "didn't make templates");
+            panic!("didn't make templates");
         };
 
         let mut main_rs = root_buf.clone();
@@ -234,7 +232,7 @@ mod test {
             "main_file template did not work"
         );
 
-        let mut include_path = root_buf.clone();
+        let mut include_path = root_buf;
         include_path.push("test_include");
 
         let mut include_file =
@@ -260,11 +258,11 @@ mod test {
         let root = temp.setup();
 
         match make_project_tree(&temp.skeleton.as_ref().unwrap()) {
-            Ok(_) => assert!(true),
+            Ok(_) => {}
             Err(err) => assert!(false, "Error: {}", err),
         };
 
-        let mut project_root = root.clone();
+        let mut project_root = root;
         project_root.push("test_project");
 
         let mut main_rs = project_root.clone();
@@ -290,7 +288,7 @@ mod test {
             "main_file template did not work"
         );
 
-        let mut more_test = project_root.clone();
+        let mut more_test = project_root;
         more_test.push("tests/more_tests");
     }
 
@@ -304,11 +302,11 @@ mod test {
         temp.skeleton.as_mut().unwrap().templates.take();
 
         match make_project_tree(&temp.skeleton.as_ref().unwrap()) {
-            Ok(_) => assert!(true),
+            Ok(_) => {}
             Err(err) => assert!(false, "Error: {}", err),
         };
 
-        let mut project_root = root.clone();
+        let mut project_root = root;
         project_root.push("test_project");
 
         let mut main_rs = project_root.clone();
@@ -333,7 +331,7 @@ mod test {
             "main_file template did not work"
         );
 
-        let mut more_test = project_root.clone();
+        let mut more_test = project_root;
         more_test.push("tests/more_tests");
     }
 }

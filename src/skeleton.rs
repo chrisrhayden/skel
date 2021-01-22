@@ -21,7 +21,7 @@ pub struct SkeletonConfig {
     pub templates: Option<Vec<SkeletonTemplate>>,
 }
 
-///! A fully resolved and ready to make skeleton
+/// A fully resolved and ready to make skeleton
 #[derive(Debug)]
 pub struct Skeleton {
     pub name: String,
