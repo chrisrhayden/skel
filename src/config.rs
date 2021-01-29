@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env, error::Error, path::Path};
+use std::{collections::HashMap, env, error::Error};
 
 use serde::Deserialize;
 
@@ -23,7 +23,7 @@ struct ConfigPaths {
     config_dir: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct UserConfig {
     pub skeletons: HashMap<String, String>,
     pub alias: HashMap<String, Vec<String>>,
@@ -31,9 +31,8 @@ pub struct UserConfig {
 
 // get the root for the users project that the skeleton will be made in to
 fn resolve_project_root(name: &str, root_from_cli: Option<String>) -> String {
-    let mut r_string =
     // if a root is given at th cli just use that
-    if let Some(from_cli) = root_from_cli {
+    let mut r_string = if let Some(from_cli) = root_from_cli {
         from_cli
     } else {
         // default to current_dir
@@ -52,21 +51,7 @@ fn resolve_project_root(name: &str, root_from_cli: Option<String>) -> String {
     r_string
 }
 
-fn get_user_config<P>(config_path: &P) -> SkelResult<UserConfig>
-where
-    P: AsRef<Path>,
-{
-    let config_str = string_from_file(config_path.as_ref())?;
-
-    // TODO: let the user know whats wrong in a nice way
-    // idk, maybe just say bad config with the file name
-    let toml_conf = toml::from_str::<UserConfig>(&config_str)
-        .unwrap_or_else(|_| panic!("TOML Error -- {}", config_str));
-
-    Ok(toml_conf)
-}
-
-fn default_skel_config_paths() -> ConfigPaths {
+fn default_skel_config_paths(cli_config_path: Option<String>) -> ConfigPaths {
     let mut config_dir = env::var("HOME")
         .expect("HOME not set")
         .parse::<String>()
@@ -80,10 +65,16 @@ fn default_skel_config_paths() -> ConfigPaths {
     config_dir.push_str("skel");
 
     // then the actual file
-    let mut config_file = config_dir.clone();
+    let config_file = if let Some(cli_config_path) = cli_config_path {
+        cli_config_path
+    } else {
+        let mut config_file = config_dir.to_owned();
 
-    config_file.push(PATH_DELIMITER);
-    config_file.push_str("config.toml");
+        config_file.push(PATH_DELIMITER);
+        config_file.push_str("config.toml");
+
+        config_file
+    };
 
     ConfigPaths {
         config_file,
@@ -124,23 +115,34 @@ fn find_skeleton_file(
     )))
 }
 
-fn resolve_skeleton_path(alias_string: String) -> SkelResult<(String, String)> {
-    let config_paths = default_skel_config_paths();
+fn resolve_config(config_paths: &ConfigPaths) -> SkelResult<UserConfig> {
+    let config_str = string_from_file(&config_paths.config_file)?;
 
-    let user_config = get_user_config(&config_paths.config_file)?;
+    // TODO: let the user know whats wrong in a nice way
+    // idk, maybe just say bad config with the file name
+    let config = toml::from_str::<UserConfig>(&config_str)
+        .unwrap_or_else(|_| panic!("TOML Error -- {}", config_str));
 
-    let p_string = find_skeleton_file(&user_config, alias_string)?;
+    Ok(config)
+}
 
-    // this is lame but the only place empty strings are used
+fn resolve_skeleton_config_path(
+    config_paths: &ConfigPaths,
+    alias_string: String,
+) -> SkelResult<String> {
+    let user_config = resolve_config(config_paths)?;
+
+    let raw_config_string = find_skeleton_file(&user_config, alias_string)?;
+
     let template_args = TemplateArgs {
-        root_path: "",
         project_name: "",
+        project_root_path: "",
         skel_config_path: &config_paths.config_dir,
     };
 
-    let skeleton_config_string = template(&template_args, &p_string);
+    let skeleton_config_path = template(&template_args, &raw_config_string);
 
-    Ok((skeleton_config_string, config_paths.config_dir))
+    Ok(skeleton_config_path)
 }
 
 // this will iterate over all the given template structs and try and add
@@ -154,7 +156,7 @@ pub fn resolve_skeleton_templates(
 ) -> Result<(), Box<dyn Error>> {
     if let Some(ref mut temp_files) = skel_config.templates.as_mut() {
         let template_args = TemplateArgs {
-            root_path,
+            project_root_path: root_path,
             project_name: skeleton_name,
             skel_config_path,
         };
@@ -184,32 +186,31 @@ pub fn resolve_skeleton_templates(
 
 // last takes precedent:
 //      default > config > cli config
-pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Skeleton> {
+pub fn resolve_defaults(args: SkelArgs) -> SkelResult<Skeleton> {
     // get the root path to make a skeleton in to
     let root_string = resolve_project_root(&args.name, args.different_root);
 
-    // get the skeleton config and the default skel dir path for templates
-    let (skeleton_path, skel_config_path): (String, String) =
-        if let Some(skeleton_file) = args.cli_project_file.take() {
-            let config_paths = default_skel_config_paths();
+    let config_paths = default_skel_config_paths(args.cli_config_path);
 
-            (skeleton_file, config_paths.config_dir)
-        } else {
-            resolve_skeleton_path(args.alias_str)?
-        };
+    let skeleton_str = if let Some(skeleton_file_path) = args.cli_project_file {
+        string_from_file(skeleton_file_path)?
+    } else {
+        let skel_path =
+            resolve_skeleton_config_path(&config_paths, args.alias_str)?;
 
-    let skeleton_str = string_from_file(&skeleton_path)?;
+        string_from_file(skel_path)?
+    };
 
     let mut skeleton_config: SkeletonConfig = toml::from_str(&skeleton_str)
         .unwrap_or_else(|_| {
-            panic!("Toml Error in project file - {}", skeleton_path)
+            panic!("Toml Error in skeleton file - {}", skeleton_str)
         });
 
     resolve_skeleton_templates(
         &mut skeleton_config,
         &root_string,
         &args.name,
-        &skel_config_path,
+        &config_paths.config_dir,
     )?;
 
     if skeleton_config.files.is_none()
@@ -219,9 +220,8 @@ pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Skeleton> {
         return Err(Box::from("project dose not have anything to do"));
     }
 
-    let build_first =
-        // cli overrides everything
-        args.build_first
+    // cli overrides everything
+    let build_first = args.build_first
         || (
             // make sure there is something before unwrapping
             skeleton_config.build_first.is_some()
@@ -231,12 +231,12 @@ pub fn resolve_defaults(mut args: SkelArgs) -> SkelResult<Skeleton> {
 
     Ok(Skeleton {
         build_first,
-        skel_config_path,
         name: args.name,
         dirs: skeleton_config.dirs,
         files: skeleton_config.files,
         build: skeleton_config.build,
         templates: skeleton_config.templates,
+        skel_config_path: config_paths.config_dir,
         project_root_string: root_string,
         dont_make_template: args.dont_make_templates,
         dont_run_build: args.dont_run_build,
@@ -249,13 +249,15 @@ mod test {
     use super::*;
 
     use crate::test_utils::{
-        make_fake_skeleton_config, make_fake_user_config,
+        make_fake_skel_args, make_fake_skeleton_config, make_fake_user_config,
         make_fake_user_config_no_skeleton, TempSetup,
     };
 
     #[test]
     fn test_default_skel_config_paths_default_path() {
-        let test_config_paths = default_skel_config_paths();
+        let args = make_fake_skel_args("test", "test");
+
+        let test_config_paths = default_skel_config_paths(args.cli_config_path);
 
         let mut config_dir = env::var("HOME")
             .expect("HOME not set")
@@ -353,19 +355,26 @@ mod test {
     }
 
     #[test]
-    fn test_get_user_config_from_toml() {
+    fn test_resolve_config_from_toml() {
         let mut temp = TempSetup::default();
         let root = temp.setup();
 
-        let mut temp_config = root;
-
-        temp_config.push(".config");
-        temp_config.push("skel");
-        temp_config.push("config.toml");
-
         temp.make_fake_user_config().expect("cant make user config");
 
-        let user_config = match get_user_config(&temp_config) {
+        let mut temp_config: String = root.to_str().unwrap().to_string();
+
+        temp_config.push_str("/.config");
+        temp_config.push_str("/skel");
+
+        let mut temp_config_file = temp_config.to_owned();
+        temp_config_file.push_str("/config.toml");
+
+        let config_paths = ConfigPaths {
+            config_dir: temp_config,
+            config_file: temp_config_file,
+        };
+
+        let user_config = match resolve_config(&config_paths) {
             Err(err) => {
                 assert!(false, "{}", err);
                 unreachable!();
@@ -417,12 +426,11 @@ mod test {
     }
 
     #[test]
-    fn test_resolve_skeleton_path_no_user_path() {
+    fn test_resolve_skeleton_config_path_no_user_path() {
         let mut temp = TempSetup::default();
         let root = temp.setup();
 
         let fake_home = root.to_str().unwrap();
-
         env::set_var("HOME", fake_home);
 
         temp.make_fake_user_config()
@@ -436,20 +444,22 @@ mod test {
         fake_config.push_str("/skel");
 
         let mut fake_config_file = fake_config.clone();
+        fake_config_file.push_str("/config.toml");
 
-        fake_config_file.push_str("/projects");
-        fake_config_file.push_str("/basic_cpp.toml");
+        let mut fake_skeleton_file = fake_config.clone();
+        fake_skeleton_file.push_str("/projects");
+        fake_skeleton_file.push_str("/basic_cpp.toml");
 
-        match resolve_skeleton_path(alias_str) {
-            Ok((proj_path, proj_dir)) => {
+        let config_paths = ConfigPaths {
+            config_dir: fake_config.clone(),
+            config_file: fake_config_file.clone(),
+        };
+
+        match resolve_skeleton_config_path(&config_paths, alias_str) {
+            Ok(proj_path) => {
                 assert_eq!(
-                    proj_path, fake_config_file,
+                    proj_path, fake_skeleton_file,
                     "did not find c++ toml file"
-                );
-
-                assert_eq!(
-                    proj_dir, fake_config,
-                    "did not make proj_dir right"
                 );
             }
             Err(err) => assert!(false, "Error: {}", err),
