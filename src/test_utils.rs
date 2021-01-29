@@ -115,13 +115,19 @@ impl TempSetup {
 
         fs::create_dir_all(&fake_config).expect("cant make config dir");
 
-        fake_config.push("config.toml");
+        let mut fake_config_file = fake_config.clone();
 
-        let mut config_file = fs::File::create(fake_config)?;
+        fake_config_file.push("config.toml");
+
+        let mut config_file = fs::File::create(fake_config_file)?;
 
         let toml_str = make_fake_user_toml();
 
         config_file.write_all(toml_str.as_bytes())?;
+
+        if !make_fake_project_skeletions(&fake_config) {
+            panic!("could not make fake project skeletons");
+        }
 
         Ok(())
     }
@@ -172,6 +178,28 @@ pub fn make_fake_conifg_file(root: &std::path::Path) -> bool {
     fake_conf
         .write_all(toml_str.as_bytes())
         .expect("cant write to fake toml file");
+
+    true
+}
+
+pub fn make_fake_project_skeletions(root_path: &std::path::Path) -> bool {
+    let fake_projects = vec![
+        "basic_cpp.toml",
+        "basic_javascript.toml",
+        "basic_python.toml",
+    ];
+
+    fs::create_dir_all(root_path.join("projects")).unwrap();
+
+    for file in fake_projects.iter() {
+        let mut fake_path = root_path.join("projects");
+
+        fake_path.push(file);
+
+        if let Err(err) = fs::File::create(&fake_path) {
+            panic!("Error {:?} {}", fake_path, err);
+        }
+    }
 
     true
 }
