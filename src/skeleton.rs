@@ -42,7 +42,7 @@ pub struct Skeleton {
 impl Skeleton {
     pub fn run_template(&self, to_template: &str) -> String {
         let template_args = TemplateArgs {
-            root_path: &self.project_root_string,
+            project_root_path: &self.project_root_string,
             project_name: &self.name,
             skel_config_path: &self.skel_config_path,
         };
@@ -54,7 +54,7 @@ impl Skeleton {
         match self.dirs.as_ref() {
             Some(dirs) => {
                 let template_args = TemplateArgs {
-                    root_path: &self.project_root_string,
+                    project_root_path: &self.project_root_string,
                     skel_config_path: &self.skel_config_path,
                     project_name: &self.name,
                 };
@@ -69,7 +69,7 @@ impl Skeleton {
         match self.files.as_ref() {
             Some(files) => {
                 let template_args = TemplateArgs {
-                    root_path: &self.project_root_string,
+                    project_root_path: &self.project_root_string,
                     skel_config_path: &self.skel_config_path,
                     project_name: &self.name,
                 };
@@ -84,7 +84,7 @@ impl Skeleton {
         match self.templates {
             Some(ref templates) => {
                 let template_args = TemplateArgs {
-                    root_path: &self.project_root_string,
+                    project_root_path: &self.project_root_string,
                     skel_config_path: &self.skel_config_path,
                     project_name: &self.name,
                 };
@@ -111,7 +111,7 @@ pub struct SkeletonPathIterator<'a> {
 impl<'a> SkeletonPathIterator<'a> {
     pub fn new(template_args: TemplateArgs<'a>, array: &'a [String]) -> Self {
         Self {
-            root_buf: PathBuf::from(template_args.root_path),
+            root_buf: PathBuf::from(template_args.project_root_path),
             curr: 0,
             max_len: array.len(),
             array,
@@ -171,7 +171,7 @@ impl<'a> SkeletonTemplateIterator<'a> {
         array: &'a [SkeletonTemplate],
     ) -> Self {
         Self {
-            root_buf: PathBuf::from(template_args.root_path),
+            root_buf: PathBuf::from(template_args.project_root_path),
             curr: 0,
             max_len: array.len(),
             array,
