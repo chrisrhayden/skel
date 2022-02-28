@@ -216,6 +216,7 @@ pub fn resolve_defaults(args: SkelArgs) -> SkelResult<Skeleton> {
     if skeleton_config.files.is_none()
         && skeleton_config.dirs.is_none()
         && skeleton_config.build.is_none()
+        && skeleton_config.templates.is_none()
     {
         return Err(Box::from("project dose not have anything to do"));
     }
