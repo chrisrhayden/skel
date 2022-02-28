@@ -3,7 +3,7 @@
 
 pkgname="skel"
 pkgver=0.1.1
-pkgrel=2
+pkgrel=3
 arch=("x86_64")
 url="https://github.com/chrisrhayden/${pkgname%-git}"
 makedepends=("cargo" "git")
