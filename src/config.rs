@@ -118,20 +118,14 @@ fn find_skeleton_file(
     )))
 }
 
-fn resolve_config(config_paths: &ConfigPaths) -> SkelResult<UserConfig> {
-    let config_str = string_from_file(&config_paths.config_file)?;
-
-    // TODO: let the user know whats wrong in a nice way
-    // idk, maybe just say bad config with the file name
-    let config = toml::from_str::<UserConfig>(&config_str)
-        .unwrap_or_else(|_| panic!("TOML Error -- {}", config_str));
-
+fn check_for_duplicate(config: &UserConfig) -> SkelResult<()> {
     let mut duplicates = vec![];
 
     for (i, (key_1, value_1)) in config.alias.iter().enumerate() {
         let mut duplicate = None;
-        for s in value_1.iter() {
-            for (key_2, value_2) in config.alias.iter().skip(i + 1) {
+
+        for (key_2, value_2) in config.alias.iter().skip(i + 1) {
+            for s in value_1.iter() {
                 if value_2.contains(s) {
                     if duplicate.is_none() {
                         let dup = Duplicate {
@@ -175,8 +169,21 @@ fn resolve_config(config_paths: &ConfigPaths) -> SkelResult<UserConfig> {
 
         Err(Box::from(String::from("found duplicates")))
     } else {
-        Ok(config)
+        Ok(())
     }
+}
+
+fn resolve_config(config_paths: &ConfigPaths) -> SkelResult<UserConfig> {
+    let config_str = string_from_file(&config_paths.config_file)?;
+
+    // TODO: let the user know whats wrong in a nice way
+    // idk, maybe just say bad config with the file name
+    let config = toml::from_str::<UserConfig>(&config_str)
+        .unwrap_or_else(|_| panic!("TOML Error -- {}", config_str));
+
+    check_for_duplicate(&config)?;
+
+    Ok(config)
 }
 
 fn resolve_skeleton_config_path(
