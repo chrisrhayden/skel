@@ -10,11 +10,8 @@ use crate::{
 
 use crate::args::SkelArgs;
 
-#[cfg(unix)]
+// if i ever decide so support windows
 const PATH_DELIMITER: char = '/';
-
-#[cfg(windows)]
-const PATH_DELIMITER: char = '\\';
 
 pub type SkelResult<T> = Result<T, Box<dyn Error>>;
 
@@ -185,7 +182,7 @@ pub fn resolve_skeleton_templates(
 }
 
 // last takes precedent:
-//      default > config > cli config
+//      default < config < cli config
 pub fn resolve_defaults(args: SkelArgs) -> SkelResult<Skeleton> {
     // get the root path to make a skeleton in to
     let root_string = resolve_project_root(&args.name, args.different_root);
@@ -329,7 +326,6 @@ mod test {
         assert!(project.is_err(), "project some how exists");
 
         if let Err(err) = project {
-            println!();
             assert_eq!(
                 err.to_string().as_str(),
                 "no skeleton for given alias in config -- test",
@@ -463,7 +459,7 @@ mod test {
                     "did not find c++ toml file"
                 );
             }
-            Err(err) => assert!(false, "Error: {}", err),
+            Err(err) => panic!("Error: {}", err),
         };
     }
 
@@ -531,8 +527,7 @@ mod test {
         );
 
         if let Err(err) = resolve_result {
-            assert!(
-                false,
+            panic!(
                 "resolve_skeleton_templates returned with and error: {}",
                 err
             );
