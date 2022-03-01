@@ -26,6 +26,12 @@ pub struct UserConfig {
     pub alias: HashMap<String, Vec<String>>,
 }
 
+struct Duplicate {
+    key_1: String,
+    key_2: String,
+    alias: Vec<String>,
+}
+
 // get the root for the users project that the skeleton will be made in to
 fn resolve_project_root(name: &str, root_from_cli: Option<String>) -> String {
     // if a root is given at th cli just use that
@@ -120,7 +126,57 @@ fn resolve_config(config_paths: &ConfigPaths) -> SkelResult<UserConfig> {
     let config = toml::from_str::<UserConfig>(&config_str)
         .unwrap_or_else(|_| panic!("TOML Error -- {}", config_str));
 
-    Ok(config)
+    let mut duplicates = vec![];
+
+    for (i, (key_1, value_1)) in config.alias.iter().enumerate() {
+        let mut duplicate = None;
+        for s in value_1.iter() {
+            for (key_2, value_2) in config.alias.iter().skip(i + 1) {
+                if value_2.contains(s) {
+                    if duplicate.is_none() {
+                        let dup = Duplicate {
+                            key_1: key_1.clone(),
+                            key_2: key_2.clone(),
+                            alias: vec![s.clone()],
+                        };
+
+                        duplicate = Some(dup);
+                    } else if let Some(duplicate) = &mut duplicate {
+                        duplicate.alias.push(s.clone());
+                    }
+                }
+            }
+        }
+
+        if let Some(duplicate) = duplicate {
+            duplicates.push(duplicate);
+        }
+    }
+
+    if !duplicates.is_empty() {
+        let mut dup_str = String::from("duplicate keys found\n");
+        let duplicates_len = duplicates.len() - 1;
+
+        for (i, dup) in duplicates.into_iter().enumerate() {
+            let new_dup = format!(
+                "keys 1: \x1b[31m{}\x1b[0m 2: \x1b[31m{}\x1b[0m\n    alias: [\x1b[31m{}\x1b[0m]",
+                dup.key_1,
+                dup.key_2,
+                dup.alias.join(", ")
+            );
+
+            dup_str.push_str(&new_dup);
+            if i != duplicates_len {
+                dup_str.push('\n');
+            }
+        }
+
+        println!("{}", dup_str);
+
+        Err(Box::from(String::from("found duplicates")))
+    } else {
+        Ok(config)
+    }
 }
 
 fn resolve_skeleton_config_path(
