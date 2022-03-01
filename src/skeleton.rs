@@ -219,6 +219,7 @@ impl<'a> Iterator for SkeletonTemplateIterator<'a> {
             path_buf
         };
 
+        // TODO: wtf was i doing here
         assert!(path_buf.starts_with("/"), "BUG: path was made wrong");
 
         Some((path_buf, template_string))
@@ -268,7 +269,7 @@ mod test {
 
         for d in skeleton.dirs.unwrap() {
             if !test_dirs.contains(&d.as_str()) {
-                assert!(false, "{} -- bad test dir found", d);
+                panic!("{} -- bad test dir found", d);
             }
         }
 
@@ -277,7 +278,7 @@ mod test {
 
         for f in skeleton.files.unwrap() {
             if !test_files.contains(&f.as_str()) {
-                assert!(false, "{} -- bad test files found", f);
+                panic!("{} -- bad test files found", f);
             }
         }
     }
