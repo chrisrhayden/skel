@@ -1,4 +1,5 @@
 test_dir/
+test/
 
 
 # Created by https://www.gitignore.io/api/git,vim,rust
