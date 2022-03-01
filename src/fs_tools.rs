@@ -36,6 +36,8 @@ where
 }
 
 fn make_project_dirs(project: &Skeleton) -> Result<(), Box<dyn Error>> {
+    fs::create_dir_all(&project.project_root_string)?;
+
     if let Some(dir_iter) = project.dir_iter() {
         for dir in dir_iter {
             fs::create_dir_all(dir)?;
@@ -257,9 +259,9 @@ mod test {
         let mut temp = TempSetup::default();
         let root = temp.setup();
 
-        match make_project_tree(&temp.skeleton.as_ref().unwrap()) {
+        match make_project_tree(temp.skeleton.as_ref().unwrap()) {
             Ok(_) => {}
-            Err(err) => assert!(false, "Error: {}", err),
+            Err(err) => panic!("Error: {}", err),
         };
 
         let mut project_root = root;
@@ -301,9 +303,9 @@ mod test {
 
         temp.skeleton.as_mut().unwrap().templates.take();
 
-        match make_project_tree(&temp.skeleton.as_ref().unwrap()) {
+        match make_project_tree(temp.skeleton.as_ref().unwrap()) {
             Ok(_) => {}
-            Err(err) => assert!(false, "Error: {}", err),
+            Err(err) => panic!("Error: {}", err),
         };
 
         let mut project_root = root;
