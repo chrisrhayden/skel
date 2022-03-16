@@ -118,19 +118,23 @@ fn find_skeleton_file(
     )))
 }
 
+/// check for duplicate aliases in a given config
 fn check_for_duplicate(config: &UserConfig) -> SkelResult<()> {
+    let key_alias: Vec<(&String, &Vec<String>)> = config.alias.iter().collect();
+
     let mut duplicates = vec![];
 
-    for (i, (key_1, value_1)) in config.alias.iter().enumerate() {
+    // iterate over all aliases
+    for (i, (key_1, value_1)) in key_alias.iter().enumerate() {
         let mut duplicate = None;
 
-        for (key_2, value_2) in config.alias.iter().skip(i + 1) {
+        for (key_2, value_2) in key_alias.iter().skip(i + 1) {
             for s in value_1.iter() {
                 if value_2.contains(s) {
                     if duplicate.is_none() {
                         let dup = Duplicate {
-                            key_1: key_1.clone(),
-                            key_2: key_2.clone(),
+                            key_1: key_1.to_string(),
+                            key_2: key_2.to_string(),
                             alias: vec![s.clone()],
                         };
 
