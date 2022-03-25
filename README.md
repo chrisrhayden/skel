@@ -8,11 +8,11 @@ make a project layout from a toml file
 skel takes a project type and a name and will make the corresponding project in to that name
 
 ```bash
-skel javascript project_name
+skel javascript project-name
 
-tree project_name
-#  project_name/
-#  ├── node_modules [116 entries exceeds filelimit, not opening dir]
+tree project-name
+#  project-name/
+#  ├── node-modules [116 entries exceeds filelimit, not opening dir]
 #  ├── package.json
 #  ├── src
 #  │   └── main.js
@@ -76,13 +76,13 @@ the variables:
     and ether a `template` string or an `include` file to fill the given path
 
 the slugs so far:
-  - {{root}} = the root project directory (e.g. /tmp/example_project)
-  - {{name}} = the new project name (e.g. cool_cli_tool)
-  - {{config-dir}} = the config dir used this instance
+  - {{root}} = the root project directory (e.g. /tmp/example-project)
+  - {{name}} = the new project name (e.g. cool-cli-tool)
+  - {{config_dir}} = the config dir used this instance
 
 example:
-  - "{{root}}/src" = "/tmp/example_project/src"
-  - "{{root}}/{{name}}/main.py" = "/tmp/example_project/example_project/main.py"
+  - "{{root}}/src" = "/tmp/example-project/src"
+  - "{{root}}/{{name}}/main.py" = "/tmp/example-project/example-project/main.py"
 
 
 <br>
@@ -141,13 +141,13 @@ module.run = run;
 # the template variable will be overridden by include but at least one is needed
 [[templates]]
 path  = ".eslint.json"
-include = "{{config-dir}}/projects/basic_javascript/javascript.eslint"
+include = "{{config_dir}}/projects/basic-javascript/javascript.eslint"
 ```
 
 you can call this file like
 
 ```bash
-skel --project-file ~/.config/skel/projects/javascript.toml project_name
+skel --project-file ~/.config/skel/projects/javascript.toml project-name
 ```
 
 
@@ -163,13 +163,13 @@ an example config looks like
 # the paths to the projects
 # {{config-dir}} will correspond to ~/.config/skel
 [projects]
-basic_javascript = "{{config-dir}}/projects/javascript.toml"
+basic-javascript = "{{config_dir}}/projects/javascript.toml"
 # the name or path dose not matter
-new_python = "/path/to/python_project/python.toml"
+new-python = "/path/to/python_project/python.toml"
 
 # alias's to use on the cli
 [aliases]
-basic_javascript = ["js", "j"]
+basic-javascript = ["js", "j"]
 # these can be anything
-new_python = ["py", "p", "this_is_not_shorter"]
+new-python = ["py", "p", "this_is_not_shorter"]
 ```
