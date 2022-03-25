@@ -6,9 +6,16 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use handlebars::Handlebars;
+
 use serde::Deserialize;
 
-use crate::{parse_args::SkelArgs, templating::instantiate_handlebars};
+use serde_json::{json, Value};
+
+use crate::{
+    parse_args::SkelArgs,
+    templating::{instantiate_handlebars, TempleData},
+};
 
 struct Duplicate {
     key_1: String,
@@ -24,30 +31,59 @@ struct MainConfig {
 }
 
 #[derive(Deserialize, Default)]
-pub struct Template {
-    path: PathBuf,
-    template: Option<String>,
-    include: Option<PathBuf>,
+pub struct SkelTemplate {
+    pub path: String,
+    pub template: Option<String>,
+    pub include: Option<String>,
 }
 
-/// the run time config
 #[derive(Deserialize, Default)]
 pub struct SkelConfig {
-    pub main_config_path: Option<PathBuf>,
-    pub dirs: Option<Vec<PathBuf>>,
-    pub files: Option<Vec<PathBuf>>,
-    pub templates: Option<Vec<Template>>,
+    pub dirs: Option<Vec<String>>,
+    pub files: Option<Vec<String>>,
+    pub templates: Option<Vec<SkelTemplate>>,
+}
+
+#[derive(Default)]
+pub struct RunConfig<'reg> {
+    pub skel_conf: SkelConfig,
+    pub root_string: String,
+    pub template_data: Value,
+    pub handle: Handlebars<'reg>,
+}
+
+fn get_root(args: &SkelArgs) -> Result<String, Box<dyn Error>> {
+    if let Some(diff_root) = &args.different_root {
+        let diff_root_path = Path::new(diff_root);
+
+        if diff_root_path.is_dir() {
+            Ok(diff_root.clone())
+        } else {
+            Err(Box::from(format!(
+                "different root does not exists or is not a dir {}",
+                diff_root
+            )))
+        }
+    } else {
+        let root_path = env::current_dir().expect("could not get current dir");
+
+        let root_string = root_path
+            .to_str()
+            .expect("could not parse root string")
+            .to_string();
+
+        Ok(root_string)
+    }
 }
 
 fn find_main_config_path(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
     if let Some(config_path) = &args.main_config_path {
-        // Ok(PathBuf::from(config_path))
         Ok(config_path.into())
     } else {
         let xdg_config =
             env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME not set");
 
-        let mut xdg_config_path: PathBuf = xdg_config.into();
+        let mut xdg_config_path = PathBuf::from(&xdg_config);
         xdg_config_path.push("skel");
         xdg_config_path.push("config.toml");
 
@@ -69,6 +105,7 @@ fn check_config(config: &MainConfig) -> Result<(), Box<dyn Error>> {
         let mut duplicate: Option<Duplicate> = None;
 
         for (key_2, value_2) in key_alias.iter().skip(i + 1) {
+            // TODO: check for keys here maybe
             for s in value_1.iter() {
                 if value_2.contains(s) {
                     if let Some(duplicate) = &mut duplicate {
@@ -130,11 +167,10 @@ fn get_main_config(
     Ok(config)
 }
 
-// TODO: this could probably be better
-fn find_skel_config_path(
+fn skeleton_path_from_config(
     skeleton: &str,
     main_config: &MainConfig,
-) -> Result<PathBuf, Box<dyn Error>> {
+) -> Result<String, Box<dyn Error>> {
     let skel_config_path =
         if let Some(skel_path) = main_config.skeletons.get(skeleton) {
             Some(skel_path.clone())
@@ -160,16 +196,7 @@ fn find_skel_config_path(
         };
 
     if let Some(skel_path) = skel_config_path {
-        let skel_path: PathBuf = skel_path.into();
-
-        if skel_path.is_file() {
-            Ok(skel_path)
-        } else {
-            Err(Box::from(format!(
-                "the skeleton path {} does not exists or is not a file",
-                skel_path.into_os_string().into_string().unwrap(),
-            )))
-        }
+        Ok(skel_path)
     } else {
         Err(Box::from(format!(
             "did not find matching skeleton or alias for {}",
@@ -178,22 +205,82 @@ fn find_skel_config_path(
     }
 }
 
+fn find_skel_config_path(
+    args: &SkelArgs,
+    main_config: &MainConfig,
+    handle: &Handlebars,
+    template_data: &Value,
+) -> Result<PathBuf, Box<dyn Error>> {
+    let skel_string = if let Some(skeleton) = args.skeleton.as_ref() {
+        skeleton_path_from_config(skeleton, main_config)?
+    } else if let Some(skeleton_file) = args.skeleton_file.as_ref() {
+        skeleton_file.clone()
+    } else {
+        return Err(Box::from(String::from(
+            "did not get  skeleton to make some how",
+        )));
+    };
+
+    let skel_templated = handle.render_template(&skel_string, template_data)?;
+
+    let skel_path: PathBuf = PathBuf::from(&skel_templated);
+
+    if skel_path.is_file() {
+        Ok(skel_path)
+    } else {
+        Err(Box::from(format!(
+            "skeleton file does not exist or is not a file {}",
+            skel_templated
+        )))
+    }
+}
+
 fn get_skel_config(
     skel_config_path: &Path,
 ) -> Result<SkelConfig, Box<dyn Error>> {
-    todo!();
+    let skel_config_buf = fs::read(skel_config_path)?;
+
+    toml::from_slice(&skel_config_buf).map_err(Box::from)
 }
 
-pub fn resolve_config(args: &SkelArgs) -> Result<SkelConfig, Box<dyn Error>> {
+pub fn resolve_config(args: &SkelArgs) -> Result<RunConfig, Box<dyn Error>> {
+    let root_string = get_root(args)?;
+
     let main_config_path = find_main_config_path(args)?;
 
     let main_config = get_main_config(&main_config_path)?;
 
+    let main_config_parent = match main_config_path.parent() {
+        None => return Err(Box::from(String::from("cant make files in root"))),
+        Some(value) => match value.as_os_str().to_str() {
+            None => {
+                return Err(Box::from(String::from(
+                    "cant get a string from os_str",
+                )))
+            }
+            Some(value) => value.to_string(),
+        },
+    };
+
+    let template_data = json!(TempleData {
+        root: root_string.clone(),
+        name: args.name.clone(),
+        config_dir: main_config_parent,
+    });
+
     let handle = instantiate_handlebars();
 
-    let skel_config_path = find_skel_config_path(&args.skeleton, &main_config)?;
+    let skel_config_path =
+        find_skel_config_path(args, &main_config, &handle, &template_data)?;
 
-    let skel_config = get_skel_config(&skel_config_path)?;
+    let skel_conf = get_skel_config(&skel_config_path)?;
 
-    Ok(skel_config)
+    let run_conf = RunConfig {
+        skel_conf,
+        root_string,
+        template_data,
+        handle,
+    };
+
+    Ok(run_conf)
 }

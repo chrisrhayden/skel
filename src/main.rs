@@ -1,5 +1,6 @@
 mod config;
 mod parse_args;
+mod project_tree;
 mod templating;
 
 use std::process;
@@ -8,12 +9,20 @@ use std::process;
 fn run() -> bool {
     let args = parse_args::make_args();
 
-    if let Err(err) = config::resolve_config(&args) {
-        eprintln!("{}", err);
+    let config = match config::resolve_config(&args) {
+        Err(err) => {
+            eprintln!("{}", err);
+            return false;
+        }
+        Ok(config) => config,
+    };
 
-        false
-    } else {
-        true
+    match project_tree::make_project_tree(&args, &config) {
+        Err(err) => {
+            eprintln!("{}", err);
+            false
+        }
+        Ok(_) => true,
     }
 }
 

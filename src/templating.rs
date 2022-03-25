@@ -6,10 +6,11 @@ use handlebars::{
 
 use serde::Serialize;
 
-#[derive(Serialize, Default)]
+#[derive(Serialize)]
 pub struct TempleData {
-    data_1: String,
-    data_2: String,
+    pub root: String,
+    pub name: String,
+    pub config_dir: String,
 }
 
 fn env_helper(
