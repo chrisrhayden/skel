@@ -18,44 +18,33 @@ fn resolved_template(
     run_conf: &RunConfig,
 ) -> Result<TemplateFile, Box<dyn Error>> {
     let template = if let Some(include) = skel_template.include.as_ref() {
-        let include_path_string = run_conf
-            .handle
-            .render_template(include, &run_conf.template_data)?;
-
-        let template_file_string =
-            match fs::read_to_string(&include_path_string) {
-                Err(err) => match err.kind() {
-                    ErrorKind::NotFound => {
-                        return Err(Box::from(format!(
-                            "include file not found {}",
-                            include_path_string
-                        )));
-                    }
-                    _ => return Err(Box::from(err)),
-                },
-                Ok(value) => value,
-            };
+        let template_file_string = match fs::read_to_string(&include) {
+            Err(err) => match err.kind() {
+                ErrorKind::NotFound => {
+                    return Err(Box::from(format!(
+                        "include file not found {}",
+                        include
+                    )));
+                }
+                _ => return Err(Box::from(err)),
+            },
+            Ok(value) => value,
+        };
 
         run_conf
             .handle
             .render_template(&template_file_string, &run_conf.template_data)?
     } else if let Some(template_file) = &skel_template.template {
-        run_conf
-            .handle
-            .render_template(template_file, &run_conf.template_data)?
+        template_file.clone()
     } else {
         return Err(Box::from(String::from(
             "no template string or include path for template",
         )));
     };
 
-    let template_path = run_conf
-        .handle
-        .render_template(&skel_template.path, &run_conf.template_data)?;
-
     let mut path = run_conf.root_path.clone();
 
-    path.push(&template_path);
+    path.push(&skel_template.path);
 
     let new_template = TemplateFile { path, template };
 
@@ -85,13 +74,9 @@ fn resolve_dirs(
 
     if let Some(dirs) = run_conf.skel_conf.dirs.as_ref() {
         for dir in dirs {
-            let templated_dir = run_conf
-                .handle
-                .render_template(dir, &run_conf.template_data)?;
-
             let mut dir_path = run_conf.root_path.clone();
 
-            dir_path.push(&templated_dir);
+            dir_path.push(&dir);
 
             resolved_dirs.insert(dir_path);
         }
@@ -108,13 +93,9 @@ fn resolve_files(
 
     if let Some(files) = run_conf.skel_conf.files.as_ref() {
         for file in files {
-            let file_string = run_conf
-                .handle
-                .render_template(file, &run_conf.template_data)?;
-
             let mut file_path = run_conf.root_path.clone();
 
-            file_path.push(&file_string);
+            file_path.push(&file);
 
             // NOTE: this is probably fine as we have pushed the project root
             // dir first
