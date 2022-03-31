@@ -1,4 +1,6 @@
-use std::{collections::HashSet, error::Error, fs, path::PathBuf};
+use std::{
+    collections::HashSet, error::Error, fs, io::ErrorKind, path::PathBuf,
+};
 
 use crate::{
     config::{RunConfig, SkelTemplate},
@@ -12,20 +14,32 @@ struct TemplateFile {
 }
 
 fn resolved_template(
-    template: &SkelTemplate,
+    skel_template: &SkelTemplate,
     run_conf: &RunConfig,
 ) -> Result<TemplateFile, Box<dyn Error>> {
-    let template_string = if let Some(include) = template.include.as_ref() {
+    let template = if let Some(include) = skel_template.include.as_ref() {
         let include_path_string = run_conf
             .handle
             .render_template(include, &run_conf.template_data)?;
 
-        let template_file_string = fs::read_to_string(&include_path_string)?;
+        let template_file_string =
+            match fs::read_to_string(&include_path_string) {
+                Err(err) => match err.kind() {
+                    ErrorKind::NotFound => {
+                        return Err(Box::from(format!(
+                            "include file not found {}",
+                            include_path_string
+                        )));
+                    }
+                    _ => return Err(Box::from(err)),
+                },
+                Ok(value) => value,
+            };
 
         run_conf
             .handle
             .render_template(&template_file_string, &run_conf.template_data)?
-    } else if let Some(template_file) = &template.template {
+    } else if let Some(template_file) = &skel_template.template {
         run_conf
             .handle
             .render_template(template_file, &run_conf.template_data)?
@@ -35,14 +49,15 @@ fn resolved_template(
         )));
     };
 
-    let path = run_conf
+    let template_path = run_conf
         .handle
-        .render_template(&template.path, &run_conf.template_data)?;
+        .render_template(&skel_template.path, &run_conf.template_data)?;
 
-    let new_template = TemplateFile {
-        path: path.into(),
-        template: template_string,
-    };
+    let mut path = run_conf.root_path.clone();
+
+    path.push(&template_path);
+
+    let new_template = TemplateFile { path, template };
 
     Ok(new_template)
 }
@@ -74,7 +89,11 @@ fn resolve_dirs(
                 .handle
                 .render_template(dir, &run_conf.template_data)?;
 
-            resolved_dirs.insert(templated_dir.into());
+            let mut dir_path = run_conf.root_path.clone();
+
+            dir_path.push(&templated_dir);
+
+            resolved_dirs.insert(dir_path);
         }
     }
 
@@ -93,16 +112,13 @@ fn resolve_files(
                 .handle
                 .render_template(file, &run_conf.template_data)?;
 
-            let file_path = PathBuf::from(file_string);
+            let mut file_path = run_conf.root_path.clone();
 
-            let parent = match file_path.parent() {
-                None => {
-                    return Err(Box::from(String::from(
-                        "cant make project in root",
-                    )))
-                }
-                Some(parent) => parent.to_owned(),
-            };
+            file_path.push(&file_string);
+
+            // NOTE: this is probably fine as we have pushed the project root
+            // dir first
+            let parent = file_path.parent().unwrap().to_owned();
 
             resolved_files.insert(file_path);
             resolved_dirs.push(parent);
@@ -126,7 +142,7 @@ fn print_tree(
     templates: HashSet<TemplateFile>,
 ) {
     for dir in dirs {
-        println!("  dir -> {}", dir.as_os_str().to_str().unwrap());
+        println!("  dir  -> {}", dir.as_os_str().to_str().unwrap());
     }
 
     for file in files {
@@ -145,7 +161,6 @@ fn print_tree(
         }
 
         println!("  ------");
-        // println!("----\n{}\n----", template.template);
     }
 }
 
@@ -153,28 +168,17 @@ pub fn make_project_tree(
     args: &SkelArgs,
     run_conf: &RunConfig,
 ) -> Result<(), Box<dyn Error>> {
-    let mut root_path = PathBuf::from(&run_conf.root_string);
-
-    root_path.push(&args.name);
-
-    if root_path.exists() {
-        return Err(Box::from(format!(
-            "root path exists {}",
-            root_path.as_os_str().to_str().unwrap()
-        )));
-    }
-
     let templates = resolve_templates(run_conf)?;
+
     let mut dirs = resolve_dirs(run_conf)?;
+
     let (parent_dirs, files) = resolve_files(run_conf)?;
 
     for dir in parent_dirs.into_iter() {
         dirs.insert(dir);
     }
 
-    dirs.insert(root_path);
-
-    if args.dry_run.is_some() && args.dry_run.unwrap() {
+    if args.dry_run {
         print_tree(dirs, files, templates);
     } else {
         make_tree(dirs, files, templates);
