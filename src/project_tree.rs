@@ -34,8 +34,8 @@ fn resolved_template(
         run_conf
             .handle
             .render_template(&template_file_string, &run_conf.template_data)?
-    } else if let Some(template_file) = &skel_template.template {
-        template_file.clone()
+    } else if let Some(template_str) = &skel_template.template {
+        template_str.clone()
     } else {
         return Err(Box::from(String::from(
             "no template string or include path for template",
