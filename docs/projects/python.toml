@@ -4,6 +4,10 @@ python _m venv "${HOME}/Venv/{{name}}"
 git init {{root}}
 """
 
+files = [
+    "{{name}}/__init__.py"
+]
+
 
 [[templates]]
 path = "{{name}}/main.py"
