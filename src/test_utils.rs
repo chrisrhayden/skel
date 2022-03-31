@@ -4,9 +4,8 @@ use tempfile::{tempdir, TempDir};
 
 use crate::parse_args::SkelArgs;
 
-pub const TEST_PROJECT_NAME: &str = "test_project";
+pub const TEST_PROJECT_KEY: &str = "test_project";
 pub const TEST_PROJECT_PATH: &str = "{{config_dir}}/projects/test_project.toml";
-
 pub static TEST_PROJECT_ALIASES: &[&str] = &["t", "T", "test_project"];
 
 pub const TEST_CONFIG: &str = r#"
@@ -15,7 +14,7 @@ test_project.path = "{{config_dir}}/projects/test_project.toml"
 test_project.aliases = ["t", "T", "test_project"]
 "#;
 
-pub const TEST_SKEL_NAME: &str = "projects/test_project.toml";
+pub const TEST_SKEL_NAME: &str = "test_project.toml";
 
 pub const TEST_SKEL: &str = r#"
 dirs = [
@@ -101,6 +100,8 @@ impl TestData {
             .expect("was not able to make TEST_INCLUDE_STR");
 
         let mut test_skeleton = self.temp_path.clone();
+
+        test_skeleton.push("projects");
 
         test_skeleton.push(TEST_SKEL_NAME);
 
