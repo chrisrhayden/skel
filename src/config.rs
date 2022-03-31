@@ -152,11 +152,17 @@ fn check_config(config: &MainConfig) -> Result<(), Box<dyn Error>> {
 
 fn get_main_config(
     main_config_path: &Path,
+    handle: &Handlebars,
+    template_data: &Value,
 ) -> Result<MainConfig, Box<dyn Error>> {
-    let config_string = fs::read(main_config_path)
+    let config_string = fs::read_to_string(main_config_path)
         .expect("Config does not exist or is not a file");
 
-    let config: MainConfig = toml::from_slice(&config_string)
+    let templated_config_string = handle
+        .render_template(&config_string, &template_data)
+        .expect("could not template main config");
+
+    let config: MainConfig = toml::from_str(&templated_config_string)
         .expect("config not formatted correctly");
 
     check_config(&config)?;
@@ -198,8 +204,6 @@ fn skeleton_path_from_config(
 fn find_skeleton_config_path(
     args: &SkelArgs,
     main_config: &MainConfig,
-    handle: &Handlebars,
-    template_data: &Value,
 ) -> Result<PathBuf, Box<dyn Error>> {
     // a skeleton target/project/aliases
     let skel_string = if let Some(target) = args.skeleton.as_ref() {
@@ -213,16 +217,14 @@ fn find_skeleton_config_path(
         )));
     };
 
-    let skel_templated = handle.render_template(&skel_string, template_data)?;
-
-    let skel_path: PathBuf = PathBuf::from(&skel_templated);
+    let skel_path = PathBuf::from(&skel_string);
 
     if skel_path.is_file() {
         Ok(skel_path)
     } else {
         Err(Box::from(format!(
             "skeleton file does not exist or is not a file {}",
-            skel_templated
+            skel_string
         )))
     }
 }
@@ -247,7 +249,7 @@ pub fn resolve_config<'reg>(
 ) -> Result<RunConfig<'reg>, Box<dyn Error>> {
     let (main_config_dir, main_config_path) = find_main_config_path(args)?;
 
-    let main_config = get_main_config(&main_config_path)?;
+    let handle = instantiate_handlebars();
 
     let template_data = json!(TempleData {
         root: root_string.as_os_str().to_str().unwrap().to_string(),
@@ -255,10 +257,10 @@ pub fn resolve_config<'reg>(
         config_dir: main_config_dir.as_os_str().to_str().unwrap().to_string(),
     });
 
-    let handle = instantiate_handlebars();
+    let main_config =
+        get_main_config(&main_config_path, &handle, &template_data)?;
 
-    let skel_config_path =
-        find_skeleton_config_path(args, &main_config, &handle, &template_data)?;
+    let skel_config_path = find_skeleton_config_path(args, &main_config)?;
 
     let skel_conf =
         get_skel_config(&skel_config_path, &handle, &template_data)?;
@@ -284,7 +286,7 @@ mod test {
             skeletons: HashMap::new(),
         };
 
-        let test_key_1 = test_utils::TEST_PROJECT_NAME.into();
+        let test_key_1 = test_utils::TEST_PROJECT_KEY.into();
         let test_skeleton_1 = Skeleton {
             path: test_utils::TEST_PROJECT_PATH.into(),
             aliases: test_utils::TEST_PROJECT_ALIASES
@@ -307,14 +309,16 @@ mod test {
         main_config
     }
 
-    fn fake_main_config() -> MainConfig {
+    fn fake_main_config(test_data: &test_utils::TestData) -> MainConfig {
         let mut main_config = MainConfig {
             skeletons: HashMap::new(),
         };
 
-        let test_key_1 = test_utils::TEST_PROJECT_NAME.into();
+        let test_key_1 = test_utils::TEST_PROJECT_KEY.into();
+
         let test_skeleton_1 = Skeleton {
-            path: test_utils::TEST_PROJECT_PATH.into(),
+            path: test_utils::TEST_PROJECT_PATH
+                .replace("{{config_dir}}", &test_data.temp_path_string),
             aliases: test_utils::TEST_PROJECT_ALIASES
                 .iter()
                 .map(|s| s.to_string())
@@ -392,7 +396,9 @@ mod test {
 
     #[test]
     fn test_check_config() {
-        let main_config = fake_main_config();
+        let test_data = test_utils::TestData::default();
+
+        let main_config = fake_main_config(&test_data);
 
         assert!(
             check_config(&main_config).is_ok(),
@@ -420,8 +426,10 @@ mod test {
         {
             // let test_project_key: String = "test_project".into();
 
-            let test_path =
-                "{{config_dir}}/projects/test_project.toml".to_string();
+            let test_path = format!(
+                "{}/projects/test_project.toml",
+                test_data.temp_path_string
+            );
 
             let test_aliases = vec![
                 "t".to_string(),
@@ -429,7 +437,17 @@ mod test {
                 "test_project".to_string(),
             ];
 
-            if let Ok(main_config) = get_main_config(main_config_path) {
+            let template_data = json!(TempleData {
+                root: "".into(),
+                name: "test_project".into(),
+                config_dir: test_data.temp_path_string.clone(),
+            });
+
+            let handle = instantiate_handlebars();
+
+            if let Ok(main_config) =
+                get_main_config(main_config_path, &handle, &template_data)
+            {
                 let test_project =
                     main_config.skeletons.get("test_project").unwrap();
 
@@ -452,40 +470,47 @@ mod test {
 
     #[test]
     fn test_skeleton_path_from_config_project_exists() {
-        let main_config = fake_main_config();
+        let test_data = test_utils::TestData::default();
+        let main_config = fake_main_config(&test_data);
+
+        let hand_made_project_path = test_utils::TEST_PROJECT_PATH
+            .replace("{{config_dir}}", &test_data.temp_path_string);
 
         let skel_path = skeleton_path_from_config(
-            test_utils::TEST_PROJECT_NAME,
+            test_utils::TEST_PROJECT_KEY,
             &main_config,
         )
         .expect("did not find config");
 
         assert_eq!(
-            skel_path,
-            test_utils::TEST_PROJECT_PATH,
+            skel_path, hand_made_project_path,
             "did not get the correct skeleton path"
         );
     }
 
     #[test]
     fn test_skeleton_path_from_config_alias_exists() {
-        let main_config = fake_main_config();
+        let test_data = test_utils::TestData::default();
+        let main_config = fake_main_config(&test_data);
 
         let target: String = "t".into();
+
+        let hand_made_project_path = test_utils::TEST_PROJECT_PATH
+            .replace("{{config_dir}}", &test_data.temp_path_string);
 
         let skel_path = skeleton_path_from_config(&target, &main_config)
             .expect("did not find config");
 
         assert_eq!(
-            skel_path,
-            test_utils::TEST_PROJECT_PATH,
+            skel_path, hand_made_project_path,
             "did not get the correct skeleton path"
         );
     }
 
     #[test]
     fn test_skeleton_path_from_config_does_not_exist() {
-        let main_config = fake_main_config();
+        let test_data = test_utils::TestData::default();
+        let main_config = fake_main_config(&test_data);
 
         let target: String = "does_not_exist".into();
 
@@ -503,28 +528,14 @@ mod test {
 
         let args = test_utils::test_args();
 
-        let main_config = fake_main_config();
+        let main_config = fake_main_config(&test_data);
 
-        let handle = instantiate_handlebars();
+        let mut hand_made_skel_path = test_data.temp_path.clone();
 
-        let template_data = json!(TempleData {
-            root: "".into(),
-            name: args.name.to_string(),
-            config_dir: test_data.temp_path_string.clone(),
-        });
+        hand_made_skel_path.push("projects");
+        hand_made_skel_path.push(test_utils::TEST_SKEL_NAME);
 
-        let hand_made_skel_path = handle
-            .render_template(test_utils::TEST_PROJECT_PATH, &template_data)
-            .unwrap();
-
-        let hand_made_skel_path = PathBuf::from(hand_made_skel_path);
-
-        match find_skeleton_config_path(
-            &args,
-            &main_config,
-            &handle,
-            &template_data,
-        ) {
+        match find_skeleton_config_path(&args, &main_config) {
             Ok(config_dir) => assert_eq!(
                 config_dir, hand_made_skel_path,
                 "did not make skeleton path"
@@ -550,26 +561,13 @@ mod test {
 
         args.skeleton_file = Some(skel_file.clone());
 
-        let main_config = fake_main_config();
-
-        let handle = instantiate_handlebars();
-
-        let template_data = json!(TempleData {
-            root: "".into(),
-            name: args.name.to_string(),
-            config_dir: test_data.temp_path_string.clone(),
-        });
+        let main_config = fake_main_config(&test_data);
 
         let hand_made_skel_path = PathBuf::from(skel_file);
 
         fs::File::create(&hand_made_skel_path).unwrap();
 
-        match find_skeleton_config_path(
-            &args,
-            &main_config,
-            &handle,
-            &template_data,
-        ) {
+        match find_skeleton_config_path(&args, &main_config) {
             Ok(config_dir) => {
                 assert_eq!(
                     config_dir, hand_made_skel_path,
