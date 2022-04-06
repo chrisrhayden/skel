@@ -236,25 +236,32 @@ fn find_skeleton_config_path(
     main_config: &MainConfig,
 ) -> Result<PathBuf, Box<dyn Error>> {
     // a skeleton target/project/aliases
-    let skel_string = if let Some(target) = args.skeleton.as_ref() {
-        skeleton_path_from_config(target, main_config)?
+    let skel_path = if let Some(target) = args.skeleton.as_ref() {
+        let skel_path = skeleton_path_from_config(target, main_config)?;
+
+        PathBuf::from(skel_path)
     // a file given on the cli
     } else if let Some(skeleton_file) = args.skeleton_file.as_ref() {
-        skeleton_file.clone()
+        let mut skel_path = env::current_dir()?;
+
+        println!("{:?}", skel_path);
+        skel_path.push(skeleton_file.clone());
+
+        skel_path.canonicalize()?
     } else {
         return Err(Box::from(String::from(
             "did not get skeleton to make some how",
         )));
     };
 
-    let skel_path = PathBuf::from(&skel_string);
+    println!("{:?}", skel_path);
 
     if skel_path.is_file() {
         Ok(skel_path)
     } else {
         Err(Box::from(format!(
             "skeleton file does not exist or is not a file {}",
-            skel_string
+            skel_path.as_os_str().to_str().unwrap()
         )))
     }
 }
