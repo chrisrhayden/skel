@@ -17,12 +17,6 @@ use crate::{
     templating::{instantiate_handlebars, TempleData},
 };
 
-struct Duplicate {
-    key_1: String,
-    key_2: String,
-    alias: Vec<String>,
-}
-
 #[derive(Deserialize, Debug)]
 pub struct Skeleton {
     pub path: String,
@@ -57,9 +51,7 @@ pub struct RunConfig<'reg> {
     pub handle: Handlebars<'reg>,
 }
 
-fn find_main_config_path(
-    args: &SkelArgs,
-) -> Result<(PathBuf, PathBuf), Box<dyn Error>> {
+fn find_main_config_path(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
     if let Some(config_string) = &args.main_config_path {
         let config_path = PathBuf::from(config_string);
 
@@ -70,42 +62,90 @@ fn find_main_config_path(
             )));
         }
 
-        // NOTE: this is probably fine as we check if the path is explicitly a
-        // file so this should at least return root
-        let config_dir = config_path.parent().unwrap().to_owned();
-
-        Ok((config_dir, config_path))
+        Ok(config_path)
     } else {
         let xdg_config =
             env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME not set");
 
-        let mut xdg_config_dir = PathBuf::from(&xdg_config);
-        xdg_config_dir.push("skel");
+        let mut xdg_config_path = PathBuf::from(&xdg_config);
+        xdg_config_path.push("skel");
 
-        let mut xdg_config_path = xdg_config_dir.clone();
         xdg_config_path.push("config.toml");
 
         // NOTE: if the file exist then the config dir also exists
         if xdg_config_path.is_file() {
-            Ok((xdg_config_dir, xdg_config_path))
+            Ok(xdg_config_path)
         } else {
             Err(Box::from(String::from("main config does not exist")))
         }
     }
 }
 
+fn make_duplicate_err_msg(duplicates: &[Duplicate]) -> String {
+    let mut dup_str = String::from("duplicate keys or aliases found\n");
+    let duplicates_len = duplicates.len() - 1;
+
+    for (i, dup) in duplicates.iter().enumerate() {
+        let new_dup = format!(
+                "keys [\x1b[31m{}\x1b[0m, \x1b[31m{}\x1b[0m]\n    alias: [\x1b[31m{}\x1b[0m]",
+                dup.key_1,
+                dup.key_2,
+                dup.alias.join(", ")
+            );
+
+        dup_str.push_str(&new_dup);
+        if i != duplicates_len {
+            dup_str.push('\n');
+        }
+    }
+
+    dup_str
+}
+
+// a struct to hold duplicate values in a main config
+struct Duplicate {
+    key_1: String,
+    key_2: String,
+    alias: Vec<String>,
+}
+
+// check for duplicates in the main config
+//
+// NOTE: it would be more efficient to check for the target skeleton in this function
+// but whatever
 fn check_config(config: &MainConfig) -> Result<(), Box<dyn Error>> {
+    // collect all the skeletons in to a vec so we can iterate over them in
+    // order, this i kinda wast but it is also the easiest
     let key_alias: Vec<(&String, &Skeleton)> =
         config.skeletons.iter().collect();
 
     let mut duplicates = vec![];
 
-    for (i, (key_1, value_1)) in key_alias.iter().enumerate() {
+    // iterate over all the skeletons in the main config then iterate over the
+    // following ones checking if there any duplicates
+    //
+    // TODO: rephrase this
+    // we cant skip past the previous skeletons in the inner loop as the
+    // previous skeletons have already checked if they are duplicates
+    for (i, (key_1, skeleton_1)) in key_alias.iter().enumerate() {
         let mut duplicate: Option<Duplicate> = None;
 
-        for (key_2, value_2) in key_alias.iter().skip(i + 1) {
-            for s in value_1.aliases.iter() {
-                if value_2.aliases.contains(s) {
+        for (key_2, skeleton_2) in key_alias.iter().skip(i + 1) {
+            // NOTE: i guess multiple keys will be a parsing error
+            if key_1 == key_2 {
+                let dup = Duplicate {
+                    key_1: key_1.to_string(),
+                    key_2: key_2.to_string(),
+                    alias: vec![],
+                };
+
+                duplicate = Some(dup);
+            }
+
+            // iterate over the outer values aliases and check if any are in the
+            // inside value
+            for s in skeleton_1.aliases.iter() {
+                if skeleton_2.aliases.contains(s) {
                     if let Some(duplicate) = &mut duplicate {
                         duplicate.alias.push(s.clone());
                     } else {
@@ -127,42 +167,29 @@ fn check_config(config: &MainConfig) -> Result<(), Box<dyn Error>> {
     }
 
     if !duplicates.is_empty() {
-        let mut dup_str = String::from("duplicate keys found\n");
-        let duplicates_len = duplicates.len() - 1;
+        let dup_err_msg = make_duplicate_err_msg(&duplicates);
 
-        for (i, dup) in duplicates.into_iter().enumerate() {
-            let new_dup = format!(
-                "keys [\x1b[31m{}\x1b[0m, \x1b[31m{}\x1b[0m]\n    alias: [\x1b[31m{}\x1b[0m]",
-                dup.key_1,
-                dup.key_2,
-                dup.alias.join(", ")
-            );
-
-            dup_str.push_str(&new_dup);
-            if i != duplicates_len {
-                dup_str.push('\n');
-            }
-        }
-
-        Err(Box::from(dup_str))
+        Err(Box::from(dup_err_msg))
     } else {
         Ok(())
     }
 }
 
+/// get the main config file from a given path and return it
 fn get_main_config(
     main_config_path: &Path,
     handle: &Handlebars,
     template_data: &Value,
 ) -> Result<MainConfig, Box<dyn Error>> {
-    let config_string = fs::read_to_string(main_config_path)
-        .expect("Config does not exist or is not a file");
+    let config_string = fs::read_to_string(main_config_path)?;
 
     let templated_config_string = handle
         .render_template(&config_string, &template_data)
+        // NOTE: this could be handled more elegantly
         .expect("could not template main config");
 
     let config: MainConfig = toml::from_str(&templated_config_string)
+        // NOTE: this could be handled more elegantly
         .expect("config not formatted correctly");
 
     check_config(&config)?;
@@ -170,6 +197,7 @@ fn get_main_config(
     Ok(config)
 }
 
+// retrieve the skeleton path from the main config
 fn skeleton_path_from_config(
     target: &str,
     main_config: &MainConfig,
@@ -180,8 +208,9 @@ fn skeleton_path_from_config(
         } else {
             let mut skel_path = None;
 
+            // check all the aliases to see if one matches
             for (_, skeleton) in main_config.skeletons.iter() {
-                if skeleton.aliases.iter().any(|a| a == target) {
+                if skeleton.aliases.iter().any(|s| s == target) {
                     skel_path = Some(skeleton.path.clone());
 
                     break;
@@ -201,6 +230,7 @@ fn skeleton_path_from_config(
     }
 }
 
+// find the skeleton config path and check if the file exists
 fn find_skeleton_config_path(
     args: &SkelArgs,
     main_config: &MainConfig,
@@ -213,7 +243,7 @@ fn find_skeleton_config_path(
         skeleton_file.clone()
     } else {
         return Err(Box::from(String::from(
-            "did not get  skeleton to make some how",
+            "did not get skeleton to make some how",
         )));
     };
 
@@ -247,10 +277,23 @@ pub fn resolve_config<'reg>(
     args: &SkelArgs,
     root_string: PathBuf,
 ) -> Result<RunConfig<'reg>, Box<dyn Error>> {
-    let (main_config_dir, main_config_path) = find_main_config_path(args)?;
+    let main_config_path = find_main_config_path(args)?;
+
+    let main_config_dir = match main_config_path.parent() {
+        None => {
+            // NOTE: this probably isn't possible as we have already checked
+            // if the config exists
+            return Err(Box::from(String::from(
+                "could not get the parent dir for the main config",
+            )));
+        }
+        Some(value) => value,
+    };
 
     let handle = instantiate_handlebars();
 
+    // NOTE: its probably rare for the unwraps to fail
+    // TODO: there probably a better way to make json but whatever
     let template_data = json!(TempleData {
         root: root_string.as_os_str().to_str().unwrap().to_string(),
         name: args.name.to_string(),
@@ -349,10 +392,8 @@ mod test {
         test_config_path.push("skel/config.toml");
 
         match find_main_config_path(&test_args) {
-            Ok((parent, config_path)) => {
+            Ok(config_path) => {
                 assert_eq!(config_path, test_config_path);
-
-                assert_eq!(parent, test_config_path.parent().unwrap());
             }
             Err(err) => panic!("{}", err),
         }
@@ -375,10 +416,8 @@ mod test {
         test_args.main_config_path =
             Some(test_config_path.as_os_str().to_str().unwrap().to_string());
         match find_main_config_path(&test_args) {
-            Ok((parent, config_path)) => {
+            Ok(config_path) => {
                 assert_eq!(config_path, test_config_path);
-
-                assert_eq!(parent, test_config_path.parent().unwrap());
             }
             Err(err) => panic!("{}", err),
         }
