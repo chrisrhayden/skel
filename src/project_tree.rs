@@ -1,5 +1,9 @@
 use std::{
-    collections::HashSet, error::Error, fs, io::ErrorKind, path::PathBuf,
+    collections::HashSet,
+    error::Error,
+    fs,
+    io::ErrorKind,
+    path::{Path, PathBuf},
 };
 
 use crate::{
@@ -13,6 +17,9 @@ struct TemplateFile {
     template: String,
 }
 
+// collect the template into its own struct
+//
+// this will render the include file
 fn resolved_template(
     skel_template: &SkelTemplate,
     run_conf: &RunConfig,
@@ -51,6 +58,7 @@ fn resolved_template(
     Ok(new_template)
 }
 
+// resolve all the templates and add them to a hash set
 fn resolve_templates(
     run_conf: &RunConfig,
 ) -> Result<HashSet<TemplateFile>, Box<dyn Error>> {
@@ -67,6 +75,7 @@ fn resolve_templates(
     Ok(resolved_templates)
 }
 
+// add all the dirs to a hash set
 fn resolve_dirs(
     run_conf: &RunConfig,
 ) -> Result<HashSet<PathBuf>, Box<dyn Error>> {
@@ -85,6 +94,9 @@ fn resolve_dirs(
     Ok(resolved_dirs)
 }
 
+// add all the files to a hash set and return a vec of the parent dirs
+//
+// the parent dirs will be added to the dir hash set
 fn resolve_files(
     run_conf: &RunConfig,
 ) -> Result<(Vec<PathBuf>, HashSet<PathBuf>), Box<dyn Error>> {
@@ -110,18 +122,39 @@ fn resolve_files(
 }
 
 fn make_tree(
-    _dirs: HashSet<PathBuf>,
-    _files: HashSet<PathBuf>,
-    _templates: HashSet<TemplateFile>,
-) {
-    todo!();
+    dirs: HashSet<PathBuf>,
+    files: HashSet<PathBuf>,
+    templates: HashSet<TemplateFile>,
+) -> Result<(), Box<dyn Error>> {
+    for dir in dirs {
+        fs::create_dir_all(dir)?;
+    }
+
+    for file in files {
+        fs::File::create(file)?;
+    }
+
+    for template in templates {
+        fs::write(template.path, template.template)?;
+    }
+
+    Ok(())
 }
 
 fn print_tree(
+    root: &Path,
     dirs: HashSet<PathBuf>,
     files: HashSet<PathBuf>,
     templates: HashSet<TemplateFile>,
 ) {
+    if root.exists() {
+        println!(
+            "\x1b[33mWarning {} already exists\x1b[0m\n",
+            root.as_os_str().to_str().unwrap()
+        );
+    }
+
+    println!("items to make");
     for dir in dirs {
         println!("  dir  -> {}", dir.as_os_str().to_str().unwrap());
     }
@@ -145,6 +178,10 @@ fn print_tree(
     }
 }
 
+// collect all the parts of the skeleton in to hash sets
+//
+// the hash sets are to make sure there are no duplicates, this is mostly for
+// printing out the dry run
 pub fn make_project_tree(
     args: &SkelArgs,
     run_conf: &RunConfig,
@@ -160,9 +197,9 @@ pub fn make_project_tree(
     }
 
     if args.dry_run {
-        print_tree(dirs, files, templates);
+        print_tree(&run_conf.root_path, dirs, files, templates);
     } else {
-        make_tree(dirs, files, templates);
+        return make_tree(dirs, files, templates);
     }
 
     Ok(())
