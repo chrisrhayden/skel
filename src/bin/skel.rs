@@ -4,7 +4,7 @@ use std::{
 
 use skel::{
     config::resolve_config,
-    parse_args::{make_args, SkelArgs},
+    parse_args::{parse_args, SkelArgs},
     project_tree::make_project_tree,
 };
 
@@ -34,11 +34,20 @@ fn get_root(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
 
 // the real `main()` so we can clean up before `process::exit()`
 fn run() -> Result<(), Box<dyn Error>> {
-    let args = make_args();
+    let args = parse_args()?;
 
     let mut root_string = get_root(&args)?;
 
-    root_string.push(&args.name);
+    let name = match args.name.as_ref() {
+        None => {
+            return Err(Box::from(String::from(
+                "some how did not gate a name to use",
+            )))
+        }
+        Some(value) => value,
+    };
+
+    root_string.push(name);
 
     if !args.dry_run && metadata(&root_string).is_ok() {
         return Err(Box::from(format!(
