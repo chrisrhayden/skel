@@ -29,6 +29,7 @@ pub fn make_args() -> SkelArgs {
 
 pub fn parse_args() -> Result<SkelArgs, Box<dyn Error>> {
     let mut skel_args = SkelArgs::parse();
+    println!("{:#?}", skel_args);
 
     if skel_args.skeleton.is_none() && skel_args.skeleton_file.is_none() {
         return Err(Box::from(String::from(
@@ -36,17 +37,17 @@ pub fn parse_args() -> Result<SkelArgs, Box<dyn Error>> {
         )));
     }
 
-    if skel_args.name.is_none()
-        && (skel_args.skeleton.is_some() && skel_args.skeleton_file.is_some())
-    {
-        skel_args.name = Some(skel_args.skeleton.as_ref().unwrap().to_owned());
-    }
-
     if skel_args.name.is_some()
         && skel_args.skeleton_file.is_some()
         && skel_args.skeleton.is_some()
     {
         return Err(Box::from(String::from("did not get correct args")));
+    }
+
+    if skel_args.name.is_none()
+        && (skel_args.skeleton.is_some() && skel_args.skeleton_file.is_some())
+    {
+        skel_args.name = Some(skel_args.skeleton.as_ref().unwrap().to_owned());
     }
 
     Ok(skel_args)
