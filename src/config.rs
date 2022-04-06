@@ -52,7 +52,7 @@ pub struct RunConfig<'reg> {
 }
 
 fn find_main_config_path(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
-    if let Some(config_string) = &args.main_config_path {
+    if let Some(config_string) = &args.alt_config_path {
         let config_path = PathBuf::from(config_string);
 
         if !config_path.is_file() {
@@ -292,11 +292,14 @@ pub fn resolve_config<'reg>(
 
     let handle = instantiate_handlebars();
 
+    // NOTE: we have already checked if this value exists
+    let name = args.name.as_ref().unwrap().to_owned();
+
     // NOTE: its probably rare for the unwraps to fail
-    // TODO: there probably a better way to make json but whatever
+    // NOTE: there probably a better way to make json but whatever
     let template_data = json!(TempleData {
+        name,
         root: root_string.as_os_str().to_str().unwrap().to_string(),
-        name: args.name.to_string(),
         config_dir: main_config_dir.as_os_str().to_str().unwrap().to_string(),
     });
 
@@ -413,7 +416,7 @@ mod test {
         fs::write(&test_config_path, test_utils::TEST_CONFIG)
             .expect("could not make test config");
 
-        test_args.main_config_path =
+        test_args.alt_config_path =
             Some(test_config_path.as_os_str().to_str().unwrap().to_string());
         match find_main_config_path(&test_args) {
             Ok(config_path) => {
