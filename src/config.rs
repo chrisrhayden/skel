@@ -24,15 +24,15 @@ struct Duplicate {
 }
 
 #[derive(Deserialize, Debug)]
-struct Skeleton {
-    path: String,
-    aliases: Vec<String>,
+pub struct Skeleton {
+    pub path: String,
+    pub aliases: Vec<String>,
 }
 
 /// this main config for the program
 #[derive(Deserialize, Debug)]
-struct MainConfig {
-    skeletons: HashMap<String, Skeleton>,
+pub struct MainConfig {
+    pub skeletons: HashMap<String, Skeleton>,
 }
 
 #[derive(Deserialize, Default)]
