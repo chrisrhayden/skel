@@ -7,10 +7,7 @@ use std::{
     process::Command,
 };
 
-use crate::{
-    config::{RunConfig, SkelTemplate},
-    parse_args::SkelArgs,
-};
+use crate::config::{RunConfig, SkelTemplate};
 
 // the derives are to be used in the HashSet
 #[derive(std::cmp::Eq, std::cmp::PartialEq, std::hash::Hash)]
@@ -215,7 +212,7 @@ fn print_tree(root: &Path, skel_tree: &SkelTree) {
 // the hash sets are to make sure there are no duplicates, this is mostly for
 // printing out the dry run
 pub fn make_project_tree(
-    args: &SkelArgs,
+    dry_run: bool,
     run_conf: &RunConfig,
 ) -> Result<(), Box<dyn Error>> {
     let templates = resolve_templates(run_conf)?;
@@ -238,7 +235,7 @@ pub fn make_project_tree(
         build: run_conf.skel_conf.build.as_deref(),
     };
 
-    if args.dry_run {
+    if dry_run {
         print_tree(&run_conf.root_path, &skel_tree);
 
         Ok(())
