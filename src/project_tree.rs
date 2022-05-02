@@ -4,6 +4,7 @@ use std::{
     fs,
     io::ErrorKind,
     path::{Path, PathBuf},
+    process::Command,
 };
 
 use crate::{
@@ -11,10 +12,35 @@ use crate::{
     parse_args::SkelArgs,
 };
 
+// the derives are to be used in the HashSet
 #[derive(std::cmp::Eq, std::cmp::PartialEq, std::hash::Hash)]
 struct TemplateFile {
     path: PathBuf,
     template: String,
+}
+
+struct SkelTree<'a> {
+    templates: HashSet<TemplateFile>,
+    files: HashSet<PathBuf>,
+    dirs: HashSet<PathBuf>,
+    build: Option<&'a str>,
+    build_first: bool,
+}
+
+fn run_build_script(build: &str) {
+    let mut build_script = String::from("#!/usr/bin/bash env\n\n");
+
+    build_script.push_str(build);
+
+    let output = Command::new("bash")
+        .arg("-c")
+        .arg(build_script)
+        .output()
+        .expect("build error");
+
+    if !output.stdout.is_empty() {
+        println!("{}", String::from_utf8_lossy(&output.stdout));
+    }
 }
 
 // collect the template into its own struct
@@ -94,7 +120,8 @@ fn resolve_dirs(
     Ok(resolved_dirs)
 }
 
-// add all the files to a hash set and return a vec of the parent dirs
+// add all the files to a hash set and return the set along with a vec of the
+// parent dirs
 //
 // the parent dirs will be added to the dir hash set
 fn resolve_files(
@@ -121,32 +148,31 @@ fn resolve_files(
     Ok((resolved_dirs, resolved_files))
 }
 
-fn make_tree(
-    dirs: HashSet<PathBuf>,
-    files: HashSet<PathBuf>,
-    templates: HashSet<TemplateFile>,
-) -> Result<(), Box<dyn Error>> {
-    for dir in dirs {
+fn make_tree(skel_tree: &SkelTree) -> Result<(), Box<dyn Error>> {
+    if skel_tree.build.is_some() && skel_tree.build_first {
+        run_build_script(skel_tree.build.unwrap());
+    }
+
+    for dir in &skel_tree.dirs {
         fs::create_dir_all(dir)?;
     }
 
-    for file in files {
+    for file in &skel_tree.files {
         fs::File::create(file)?;
     }
 
-    for template in templates {
-        fs::write(template.path, template.template)?;
+    for template in &skel_tree.templates {
+        fs::write(&template.path, &template.template)?;
+    }
+
+    if skel_tree.build.is_some() && !skel_tree.build_first {
+        run_build_script(skel_tree.build.unwrap());
     }
 
     Ok(())
 }
 
-fn print_tree(
-    root: &Path,
-    dirs: HashSet<PathBuf>,
-    files: HashSet<PathBuf>,
-    templates: HashSet<TemplateFile>,
-) {
+fn print_tree(root: &Path, skel_tree: &SkelTree) {
     if root.exists() {
         println!(
             "\x1b[33mWarning {} already exists\x1b[0m\n",
@@ -154,16 +180,16 @@ fn print_tree(
         );
     }
 
-    println!("items to make");
-    for dir in dirs {
+    println!("would make in to -> {}", root.as_os_str().to_str().unwrap());
+    for dir in &skel_tree.dirs {
         println!("  dir  -> {}", dir.as_os_str().to_str().unwrap());
     }
 
-    for file in files {
+    for file in &skel_tree.files {
         println!("  file -> {}", file.as_os_str().to_str().unwrap());
     }
 
-    for template in templates {
+    for template in &skel_tree.templates {
         println!("  ------");
         println!(
             "  template -> {}",
@@ -175,6 +201,12 @@ fn print_tree(
         }
 
         println!("  ------");
+    }
+
+    if let Some(build) = skel_tree.build {
+        println!("  build first = {}", skel_tree.build_first);
+
+        println!("  ------\n    {}\n  ------", build);
     }
 }
 
@@ -196,11 +228,21 @@ pub fn make_project_tree(
         dirs.insert(dir);
     }
 
-    if args.dry_run {
-        print_tree(&run_conf.root_path, dirs, files, templates);
-    } else {
-        return make_tree(dirs, files, templates);
-    }
+    let build_first = run_conf.skel_conf.build_first.unwrap_or(false);
 
-    Ok(())
+    let skel_tree = SkelTree {
+        files,
+        dirs,
+        templates,
+        build_first,
+        build: run_conf.skel_conf.build.as_deref(),
+    };
+
+    if args.dry_run {
+        print_tree(&run_conf.root_path, &skel_tree);
+
+        Ok(())
+    } else {
+        make_tree(&skel_tree)
+    }
 }
