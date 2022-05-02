@@ -16,20 +16,10 @@ pub struct SkelArgs {
     pub dry_run: bool,
 }
 
-// NOTE: this is a test function
-pub fn make_args() -> SkelArgs {
-    SkelArgs {
-        alt_config_path: Some("./docs/example.config.toml".into()),
-        skeleton: Some(String::from("py")),
-        name: Some(String::from("fuck")),
-        dry_run: true,
-        ..Default::default()
-    }
-}
-
+// TODO: make a better error message
+// NOTE: i dont know a way to get clap to parse the args the way i want
 pub fn parse_args() -> Result<SkelArgs, Box<dyn Error>> {
     let mut skel_args = SkelArgs::parse();
-    println!("{:#?}", skel_args);
 
     if skel_args.skeleton.is_none() && skel_args.skeleton_file.is_none() {
         return Err(Box::from(String::from(
@@ -41,13 +31,31 @@ pub fn parse_args() -> Result<SkelArgs, Box<dyn Error>> {
         && skel_args.skeleton_file.is_some()
         && skel_args.skeleton.is_some()
     {
-        return Err(Box::from(String::from("did not get correct args")));
+        return Err(Box::from(String::from(
+            "Error: both a skeleton file and a skeleton project given",
+        )));
     }
 
+    if skel_args.skeleton.is_some()
+        && (skel_args.name.is_none() && skel_args.skeleton_file.is_none())
+    {
+        return Err(Box::from(String::from("Error: did not get enough args")));
+    }
+
+    if skel_args.skeleton_file.is_some()
+        && (skel_args.skeleton.is_none() && skel_args.name.is_none())
+    {
+        return Err(Box::from(String::from(
+            "Error: did not get a project name to make",
+        )));
+    }
+
+    // if `name` is none and `skeleton` and `skeleton_file` is some then the
+    // `skeleton` variable is where `name` is
     if skel_args.name.is_none()
         && (skel_args.skeleton.is_some() && skel_args.skeleton_file.is_some())
     {
-        skel_args.name = Some(skel_args.skeleton.as_ref().unwrap().to_owned());
+        skel_args.name = skel_args.skeleton.take();
     }
 
     Ok(skel_args)
