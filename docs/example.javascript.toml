@@ -25,7 +25,7 @@ dirs = [
 # so if you have `src/foo/main.js` you need `src/foo` in the dirs list
 files = [
     "src/main.js",
-    "src/foo/{{name}}.txt"
+    "src/foo/{{name}}.txt",
     ".eslint.json",
 ]
 

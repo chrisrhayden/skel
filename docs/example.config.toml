@@ -1,7 +1,7 @@
 [skeletons]
-basic_cpp.path = "{{config_dir}}/projects/cpp.toml"
+basic_cpp.path = "{{config-dir}}/projects/cpp.toml"
 basic_cpp.aliases = ["cpp", "cp", "c++"]
-basic_javascript.path = "{{config_dir}}/projects/javascript.toml"
+basic_javascript.path = "{{config-dir}}/projects/javascript.toml"
 basic_javascript.aliases = ["js"]
-basic_python.path = "{{config_dir}}/projects/python.toml"
+basic_python.path = "{{config-dir}}/projects/python.toml"
 basic_python.aliases = ["py", "p"]
