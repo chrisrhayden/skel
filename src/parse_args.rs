@@ -16,14 +16,14 @@ pub struct SkelArgs {
     pub dry_run: bool,
 }
 
-// TODO: make a better error message
+// TODO: make a better error messages
 // NOTE: i dont know a way to get clap to parse the args the way i want
 pub fn parse_args() -> Result<SkelArgs, Box<dyn Error>> {
     let mut skel_args = SkelArgs::parse();
 
     if skel_args.skeleton.is_none() && skel_args.skeleton_file.is_none() {
         return Err(Box::from(String::from(
-            "did not get a skeleton or skeleton-file to make",
+            "Error: did not get a skeleton or skeleton-file to make",
         )));
     }
 
@@ -32,7 +32,7 @@ pub fn parse_args() -> Result<SkelArgs, Box<dyn Error>> {
         && skel_args.skeleton.is_some()
     {
         return Err(Box::from(String::from(
-            "Error: both a skeleton file and a skeleton project given",
+            "Error: both a skeleton and a skeleton-file given",
         )));
     }
 
