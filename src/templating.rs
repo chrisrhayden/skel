@@ -4,15 +4,6 @@ use handlebars::{
     Context, Handlebars, Helper, JsonRender, Output, RenderContext, RenderError,
 };
 
-use serde::Serialize;
-
-#[derive(Serialize)]
-pub struct TempleData {
-    pub root: String,
-    pub name: String,
-    pub config_dir: String,
-}
-
 fn env_helper(
     h: &Helper,
     _: &Handlebars,
