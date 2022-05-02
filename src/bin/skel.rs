@@ -21,14 +21,7 @@ fn get_root(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
             )))
         }
     } else {
-        let root_path = current_dir().expect("could not get current dir");
-
-        let root_string = root_path
-            .to_str()
-            .expect("could not parse root string")
-            .into();
-
-        Ok(root_string)
+        Ok(current_dir().expect("could not get current dir"))
     }
 }
 
@@ -58,7 +51,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let config = resolve_config(&args, root_string)?;
 
-    make_project_tree(&args, &config)
+    make_project_tree(args.dry_run, &config)
 }
 
 /// this wraps `run()` so everything can be cleaned up before exiting with an error
