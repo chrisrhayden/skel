@@ -5,12 +5,12 @@ use tempfile::{tempdir, TempDir};
 use crate::parse_args::SkelArgs;
 
 pub const TEST_PROJECT_KEY: &str = "test_project";
-pub const TEST_PROJECT_PATH: &str = "{{config_dir}}/projects/test_project.toml";
+pub const TEST_PROJECT_PATH: &str = "{{config-dir}}/projects/test_project.toml";
 pub static TEST_PROJECT_ALIASES: &[&str] = &["t", "T", "test_project"];
 
 pub const TEST_CONFIG: &str = r#"
 [skeletons]
-test_project.path = "{{config_dir}}/projects/test_project.toml"
+test_project.path = "{{config-dir}}/projects/test_project.toml"
 test_project.aliases = ["t", "T", "test_project"]
 "#;
 
@@ -33,7 +33,7 @@ template = "this is a test template for {{name}}"
 
 [[templates]]
 path = "test_src/test_template_include_file.txt"
-include = "{{config_dir}}/projects/test_include_file.txt"
+include = "{{config-dir}}/projects/test_include_file.txt"
 "#;
 
 pub const TEST_INCLUDE_NAME: &str = "projects/test_include_file.txt";
@@ -115,7 +115,7 @@ impl TestData {
 pub fn test_args() -> SkelArgs {
     SkelArgs {
         skeleton: Some(String::from("t")),
-        name: String::from("test_project"),
+        name: Some(String::from("test_project")),
         dry_run: true,
         ..Default::default()
     }
