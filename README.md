@@ -78,7 +78,7 @@ the variables:
 the slugs so far:
   - {{root}} = the root project directory (e.g. /tmp/example-project)
   - {{name}} = the new project name (e.g. cool-cli-tool)
-  - {{config_dir}} = the config dir used this instance
+  - {{config-dir}} = the config dir used this instance
 
 example:
   - "{{root}}/src" = "/tmp/example-project/src"
@@ -141,7 +141,7 @@ module.run = run;
 # the template variable will be overridden by include but at least one is needed
 [[templates]]
 path  = ".eslint.json"
-include = "{{config_dir}}/projects/basic-javascript/javascript.eslint"
+include = "{{config-dir}}/projects/basic-javascript/javascript.eslint"
 ```
 
 you can call this file like
@@ -163,7 +163,7 @@ an example config looks like
 # the paths to the projects
 # {{config-dir}} will correspond to ~/.config/skel
 [projects]
-basic-javascript = "{{config_dir}}/projects/javascript.toml"
+basic-javascript = "{{config-dir}}/projects/javascript.toml"
 # the name or path dose not matter
 new-python = "/path/to/python_project/python.toml"
 
