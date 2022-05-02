@@ -80,6 +80,13 @@ fn find_main_config_path(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
     }
 }
 
+// a struct to hold duplicate values in a main config
+struct Duplicate<'a> {
+    key_1: &'a str,
+    key_2: &'a str,
+    alias: Vec<&'a str>,
+}
+
 fn make_duplicate_err_msg(duplicates: &[Duplicate]) -> String {
     let mut dup_str = String::from("duplicate keys or aliases found\n");
     let duplicates_len = duplicates.len() - 1;
@@ -93,6 +100,7 @@ fn make_duplicate_err_msg(duplicates: &[Duplicate]) -> String {
             );
 
         dup_str.push_str(&new_dup);
+
         if i != duplicates_len {
             dup_str.push('\n');
         }
@@ -101,20 +109,13 @@ fn make_duplicate_err_msg(duplicates: &[Duplicate]) -> String {
     dup_str
 }
 
-// a struct to hold duplicate values in a main config
-struct Duplicate {
-    key_1: String,
-    key_2: String,
-    alias: Vec<String>,
-}
-
 // check for duplicates in the main config
 //
 // NOTE: it would be more efficient to check for the target skeleton in this function
 // but whatever
 fn check_config(config: &MainConfig) -> Result<(), Box<dyn Error>> {
     // collect all the skeletons in to a vec so we can iterate over them in
-    // order, this i kinda wast but it is also the easiest
+    // order, this is kinda waist but it is also the easiest
     let key_alias: Vec<(&String, &Skeleton)> =
         config.skeletons.iter().collect();
 
@@ -133,25 +134,25 @@ fn check_config(config: &MainConfig) -> Result<(), Box<dyn Error>> {
             // NOTE: i guess multiple keys will be a parsing error
             if key_1 == key_2 {
                 let dup = Duplicate {
-                    key_1: key_1.to_string(),
-                    key_2: key_2.to_string(),
+                    key_1,
+                    key_2,
                     alias: vec![],
                 };
 
                 duplicate = Some(dup);
             }
 
-            // iterate over the outer values aliases and check if any are in the
-            // inside value
+            // iterate over the outer value's aliases and check if any are in
+            // the inside value
             for s in skeleton_1.aliases.iter() {
                 if skeleton_2.aliases.contains(s) {
-                    if let Some(duplicate) = &mut duplicate {
-                        duplicate.alias.push(s.clone());
+                    if let Some(ref mut duplicate) = duplicate {
+                        duplicate.alias.push(s);
                     } else {
                         let dup = Duplicate {
-                            key_1: key_1.to_string(),
-                            key_2: key_2.to_string(),
-                            alias: vec![s.clone()],
+                            key_1,
+                            key_2,
+                            alias: vec![s],
                         };
 
                         duplicate = Some(dup);
@@ -234,7 +235,7 @@ fn find_skeleton_config_path(
     args: &SkelArgs,
     main_config: &MainConfig,
 ) -> Result<PathBuf, Box<dyn Error>> {
-    // a skeleton target/project/aliases
+    // a skeleton target or project or alias
     let skel_path = if let Some(target) = args.skeleton.as_ref() {
         let skel_path = skeleton_path_from_config(target, main_config)?;
 
@@ -260,7 +261,7 @@ fn find_skeleton_config_path(
     }
 }
 
-fn get_skel_config<P: AsRef<Path>>(
+fn make_skel_config<P: AsRef<Path>>(
     skel_config_path: P,
     handle: &Handlebars,
     template_data: &Value,
@@ -295,7 +296,7 @@ pub fn resolve_config<'reg>(
 
     let handle = instantiate_handlebars();
 
-    // NOTE: we have already checked if this value exists
+    // NOTE: we have already checked if this value exists when parsing args
     let name = args.name.as_ref().unwrap().to_owned();
 
     // NOTE: its probably rare for the unwraps to fail
@@ -312,7 +313,7 @@ pub fn resolve_config<'reg>(
     let skel_config_path = find_skeleton_config_path(args, &main_config)?;
 
     let skel_conf =
-        get_skel_config(&skel_config_path, &handle, &template_data)?;
+        make_skel_config(&skel_config_path, &handle, &template_data)?;
 
     let run_conf = RunConfig {
         skel_conf,
@@ -642,7 +643,7 @@ mod test {
             .unwrap();
 
         if let Err(err) =
-            get_skel_config(&skel_config_path, &handle, &template_data)
+            make_skel_config(&skel_config_path, &handle, &template_data)
         {
             panic!("{}", err);
         }
@@ -658,8 +659,12 @@ mod test {
 
         let handle = instantiate_handlebars();
 
-        if get_skel_config("/tmp/does_not_exists.toml", &handle, &template_data)
-            .is_ok()
+        if make_skel_config(
+            "/tmp/does_not_exists.toml",
+            &handle,
+            &template_data,
+        )
+        .is_ok()
         {
             panic!("some how config exists");
         }
