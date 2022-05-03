@@ -3,38 +3,18 @@
 local -a subcmd
 
 subcmd=(
-    {-n,--no-build}'[dont run the build script]'
-    {-N,--no-templating}'[dont make templates]'
-    {-V,--version}'[prints version information]'
-    {-c,--different-config}'[use a different config file]'
-    {-r,--different-root}'[use a different root path]'
-    {-p,--project-file}'[specify a project file to use]'
+    {-a,--alt-config-path}'[a path to a main config file]'
+    {-D,--different-root}'[a different root to make the project in to]'
+    {-s,--skeleton-file}'[a path to a skeleton file]'
+    {-d,--dry-run}'[print out what will be done]'
 )
 
 
 _projects() {
     local project_names
 
-    # project_names="$(grep -oP '^\w+\w(?!\\s+=.*)' ~/.config/skel/config.toml)"
-
-    # project_alias="$(grep -P '^\w+\s+=\s+\[' ~/.config/skel/config.toml \
-    #     | sed -E -e 's|\w+\s+=\s+\[(.+)\]|\1|g' \
-    #     | sed -e 's|[",]||g' | tr ' ' '\n'
-    # )"
-
-
-    # projects=()
-
-    # while IFS=  read -r line; do
-    #     projects+=( $line )
-    # done <<< $project_names
-
-    # while IFS= read -r line; do
-    #     projects+=( $line )
-    # done <<< $project_alias
-
     projects=( \
-        $(/home/chris/proj/skel/target/debug/_skel_completion --both) \
+        $(/home/chris/proj/skel/target/debug/_skel_completion) \
     )
 
     _values 'projects' ${projects[@]}
