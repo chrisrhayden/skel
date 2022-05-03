@@ -4,10 +4,21 @@ version = "0.1.1"
 authors = ["chris <chrisrhayden@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# See more keys and their definitions at https://doc.rust_lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "skel"
+path = "src/bin/skel.rs"
+
+[[bin]]
+name = "_skel_completion"
+path = "src/bin/completion.rs"
 
 [dependencies]
-tempfile = "3"
+clap = { version = "3", features = ["derive"] }
+handlebars = "4"
 toml = "0.5"
 serde = { version = "1.0", features = ["derive"] }
-clap = "2"
+serde_json = "^1.0.0"
+
+[dev-dependencies]
+tempfile = "3"

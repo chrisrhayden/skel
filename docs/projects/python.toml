@@ -1,0 +1,48 @@
+build = """
+python _m venv "${HOME}/Venv/{{name}}"
+
+git init {{root}}
+"""
+
+files = [
+    "{{name}}/__init__.py"
+]
+
+
+[[templates]]
+path = "{{name}}/main.py"
+template = """def main():
+    ''' main function '''
+    print('hello wolrd')
+
+if __name__ == '__main__':
+    main()
+"""
+
+[[templates]]
+path = ".init.sh"
+template = """
+init_env() {
+    local env_dir project_name full_path
+
+    # if the env exists there is nothing to do
+    if [[ _n $VIRTUAL_ENV ]]; then
+        return 0
+    fi
+
+    env_dir="${HOME}/Venv"
+
+    # just get the base name form the present working dir
+    project_name="${PWD##*/}"
+
+    full_path="${env_dir}/${project_name}/bin/activate"
+
+    if [[ _f $full_path ]]; then
+        source "$full_path"
+    fi
+
+    return 0
+}
+
+init_env
+"""

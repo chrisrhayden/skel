@@ -15,23 +15,27 @@ subcmd=(
 _projects() {
     local project_names
 
-    project_names="$(grep -oP '^\w+\w(?!\\s+=.*)' ~/.config/skel/config.toml)"
+    # project_names="$(grep -oP '^\w+\w(?!\\s+=.*)' ~/.config/skel/config.toml)"
 
-    project_alias="$(grep -P '^\w+\s+=\s+\[' ~/.config/skel/config.toml \
-        | sed -E -e 's|\w+\s+=\s+\[(.+)\]|\1|g' \
-        | sed -e 's|[",]||g' | tr ' ' '\n'
-    )"
+    # project_alias="$(grep -P '^\w+\s+=\s+\[' ~/.config/skel/config.toml \
+    #     | sed -E -e 's|\w+\s+=\s+\[(.+)\]|\1|g' \
+    #     | sed -e 's|[",]||g' | tr ' ' '\n'
+    # )"
 
 
-    projects=()
+    # projects=()
 
-    while IFS=  read -r line; do
-        projects+=( $line )
-    done <<< $project_names
+    # while IFS=  read -r line; do
+    #     projects+=( $line )
+    # done <<< $project_names
 
-    while IFS= read -r line; do
-        projects+=( $line )
-    done <<< $project_alias
+    # while IFS= read -r line; do
+    #     projects+=( $line )
+    # done <<< $project_alias
+
+    projects=( \
+        $(/home/chris/proj/skel/target/debug/_skel_completion --both) \
+    )
 
     _values 'projects' ${projects[@]}
 }

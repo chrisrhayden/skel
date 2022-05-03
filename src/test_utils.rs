@@ -1,322 +1,122 @@
-#![cfg(test)]
-#![allow(dead_code)]
-use std::{error::Error, fs, path::PathBuf};
+use std::{env, fs, path::PathBuf};
 
 use tempfile::{tempdir, TempDir};
 
-use toml;
+use crate::parse_args::SkelArgs;
 
-use crate::{
-    args::SkelArgs,
-    config::UserConfig,
-    skeleton::{Skeleton, SkeletonConfig},
-};
+pub const TEST_PROJECT_KEY: &str = "test_project";
+pub const TEST_PROJECT_PATH: &str = "{{config-dir}}/projects/test_project.toml";
+pub static TEST_PROJECT_ALIASES: &[&str] = &["t", "T", "test_project"];
 
-#[derive(Default)]
-pub struct TempSetup {
-    pub root: PathBuf,
-    pub temp: Option<TempDir>,
-    pub skeleton: Option<Skeleton>,
-}
-
-impl TempSetup {
-    pub fn setup(&mut self) -> PathBuf {
-        self.temp = Some(tempdir().unwrap());
-        self.root = self.temp.as_ref().unwrap().path().to_owned();
-
-        self.skeleton =
-            Some(make_fake_skeleton(Some(self.root.to_str().unwrap())));
-
-        self.root.clone()
-    }
-
-    pub fn root_buf(&self) -> PathBuf {
-        self.root.clone()
-    }
-
-    pub fn make_fake_skeleton_dirs(
-        &self,
-        skeleton: Option<&Skeleton>,
-    ) -> Result<(), Box<dyn Error>> {
-        if !self.root.exists() {
-            panic!("must be run after setup");
-        }
-
-        let skeleton = if let Some(proj) = skeleton {
-            proj
-        } else {
-            self.skeleton.as_ref().unwrap()
-        };
-
-        for dir in skeleton
-            .dir_iter()
-            .expect("cant get dirs in make_fake_skeleton_dirs")
-        {
-            fs::create_dir_all(dir)?;
-        }
-
-        Ok(())
-    }
-
-    pub fn make_fake_skeleton_files(
-        &self,
-        skeleton: Option<&Skeleton>,
-    ) -> Result<(), Box<dyn Error>> {
-        if !self.root.exists() {
-            panic!("must be run after setup");
-        }
-
-        let skeleton = if let Some(proj) = skeleton {
-            proj
-        } else {
-            self.skeleton.as_ref().unwrap()
-        };
-
-        for file in skeleton
-            .file_iter()
-            .expect("cant get files in make_fake_skeleton_files")
-        {
-            fs::File::create(file)?;
-        }
-
-        Ok(())
-    }
-
-    // im not sure what would be a better way
-    pub fn make_fake_skeleton_tree(&self) -> Result<(), Box<dyn Error>> {
-        if !self.root.exists() {
-            panic!("must be run after setup");
-        }
-
-        let skeleton = self.skeleton.as_ref();
-
-        if let Err(err) = self.make_fake_skeleton_dirs(skeleton) {
-            eprintln!("{}", err);
-            panic!("can t make dirs {}", err);
-        }
-
-        if let Err(err) = self.make_fake_skeleton_files(skeleton) {
-            eprintln!("{}", err);
-            panic!("can t make files: {}", err);
-        }
-
-        // TODO: add templating
-
-        Ok(())
-    }
-
-    pub fn make_fake_user_config(&self) -> Result<(), Box<dyn Error>> {
-        use std::io::Write;
-
-        let mut fake_config = self.root_buf();
-
-        fake_config.push(".config");
-        fake_config.push("skel");
-
-        fs::create_dir_all(&fake_config).expect("cant make config dir");
-
-        let mut fake_config_file = fake_config.clone();
-
-        fake_config_file.push("config.toml");
-
-        let mut config_file = fs::File::create(fake_config_file)?;
-
-        let toml_str = make_fake_user_toml();
-
-        config_file.write_all(toml_str.as_bytes())?;
-
-        if !make_fake_project_skeletions(&fake_config) {
-            panic!("could not make fake project skeletons");
-        }
-
-        Ok(())
-    }
-
-    pub fn make_fake_include(&self) -> Result<(), Box<dyn Error>> {
-        use std::io::Write;
-
-        let mut fake_inlcude = self.root_buf();
-
-        fake_inlcude.push("test_include");
-
-        let mut include_file = fs::File::create(fake_inlcude)?;
-
-        include_file.write_all(b"test include value")?;
-
-        Ok(())
-    }
-}
-
-impl Drop for TempSetup {
-    fn drop(&mut self) {
-        if let Some(temp) = self.temp.take() {
-            temp.close().expect("cant close file");
-        }
-    }
-}
-
-pub fn make_fake_skel_args(name: &str, alias_str: &str) -> SkelArgs {
-    SkelArgs {
-        name: name.to_owned(),
-        alias_str: alias_str.to_string(),
-        different_root: None,
-        cli_config_path: None,
-        cli_project_file: None,
-        dont_run_build: false,
-        dont_make_templates: false,
-        build_first: false,
-        show_build_output: false,
-    }
-}
-
-pub fn make_fake_conifg_file(root: &std::path::Path) -> bool {
-    use std::io::Write;
-
-    let toml_str = make_fake_skeleton_toml();
-    let mut fake_conf = fs::File::create(root).expect("cant make file in temp");
-
-    fake_conf
-        .write_all(toml_str.as_bytes())
-        .expect("cant write to fake toml file");
-
-    true
-}
-
-pub fn make_fake_project_skeletions(root_path: &std::path::Path) -> bool {
-    let fake_projects = vec![
-        "basic_cpp.toml",
-        "basic_javascript.toml",
-        "basic_python.toml",
-    ];
-
-    fs::create_dir_all(root_path.join("projects")).unwrap();
-
-    for file in fake_projects.iter() {
-        let mut fake_path = root_path.join("projects");
-
-        fake_path.push(file);
-
-        if let Err(err) = fs::File::create(&fake_path) {
-            panic!("Error {:?} {}", fake_path, err);
-        }
-    }
-
-    true
-}
-
-pub fn make_fake_skeleton_config() -> SkeletonConfig {
-    let fake_toml = make_fake_skeleton_toml();
-
-    toml::from_str::<SkeletonConfig>(&fake_toml)
-        .expect("cant make config from fake toml")
-}
-
-pub fn make_fake_skeleton(root: Option<&str>) -> Skeleton {
-    let mut root: String = if let Some(root) = root {
-        String::from(root)
-    } else {
-        String::from("/tmp/test_root")
-    };
-
-    let name = String::from("test_project");
-
-    root.push('/');
-    root.push_str(&name);
-
-    let conf_path_dir = String::from("/tmp/fake_config/");
-
-    let config = make_fake_skeleton_config();
-
-    let args = make_fake_skel_args(&name, "fake_type");
-
-    let build_first = args.build_first
-        || (config.build_first.is_some() && config.build_first.unwrap());
-
-    Skeleton {
-        build_first,
-        dirs: config.dirs,
-        files: config.files,
-        build: config.build,
-        templates: config.templates,
-        skel_config_path: conf_path_dir,
-        name: args.name,
-        project_root_string: root,
-        dont_make_template: args.dont_make_templates,
-        dont_run_build: args.dont_run_build,
-        show_build_output: args.show_build_output,
-    }
-}
-
-pub fn make_fake_user_config() -> UserConfig {
-    let fake_toml = make_fake_user_toml();
-
-    toml::from_str::<UserConfig>(&fake_toml)
-        .expect("did not make user config from toml")
-}
-
-pub fn make_fake_user_config_no_skeleton() -> UserConfig {
-    let fake_toml = r#"
-        [skeletons]
-        [alias]
-        basic_cpp = ["cpp", "cp", "c++"]
-        basic_javascript = ["js", "j"]
-        basic_python = ["py", "p"]
-        "#;
-
-    toml::from_str::<UserConfig>(&fake_toml)
-        .expect("did not make user config from toml")
-}
-
-pub fn make_fake_user_toml() -> String {
-    r#"
-# the paths to the projects
-# {{config-dir}} will correspond to ~/.config/skel
+pub const TEST_CONFIG: &str = r#"
 [skeletons]
-basic_cpp = "{{config-dir}}/projects/basic_cpp.toml"
-basic_javascript = "{{config-dir}}/projects/basic_javascript.toml"
-basic_python = "{{config-dir}}/projects/basic_python.toml"
+test_project.path = "{{config-dir}}/projects/test_project.toml"
+test_project.aliases = ["t", "T", "test_project"]
+"#;
 
-# alias's to use on the cli
-[alias]
-basic_cpp = ["cpp", "cp", "c++"]
-basic_javascript = ["js", "j"]
-basic_python = ["py", "p"]
-        "#
-    .to_owned()
-}
+pub const TEST_SKEL_NAME: &str = "test_project.toml";
 
-pub fn make_fake_skeleton_toml() -> String {
-    r#"
+pub const TEST_SKEL: &str = r#"
 dirs = [
-    "src",
-    "tests",
-    "tests/more_tests"
+    "test_src",
+    "another_test_dir"
 ]
+
 files = [
-    "src/main.rs",
-    "tests/test_main.rs"
+    "test_src/test_main.rs",
+    "another_test_files.txt",
 ]
 
-build = """
-touch test_build
-if [[ -d test_project ]]; then
-    echo "running in $PWD"
-fi"""
+[[templates]]
+path = "test_src/test_template_file.txt"
+template = "this is a test template for {{name}}"
 
 [[templates]]
-path = "src/main.rs"
-template = """fn main() {
-    println!("hello {{name}}");
+path = "test_src/test_template_include_file.txt"
+include = "{{config-dir}}/projects/test_include_file.txt"
+"#;
+
+pub const TEST_INCLUDE_NAME: &str = "projects/test_include_file.txt";
+
+pub const TEST_INCLUDE_STR: &str = "this is the include test file for {{name}}";
+
+pub struct TestData {
+    pub temp_dir: TempDir,
+    pub temp_path: PathBuf,
+    pub temp_path_string: String,
+    pub test_main_config_path: Option<PathBuf>,
 }
-"""
 
-[[templates]]
-path ="tests/test_main.rs"
-template = "// no tests yet for {{name}}"
+impl Default for TestData {
+    fn default() -> Self {
+        let temp_dir = tempdir().expect("could not make temp directory");
 
-[[templates]]
-path = "src/test_include.txt"
-include = "{{config-dir}}/test_include.txt"
-"#
-    .to_string()
+        let temp_path = temp_dir.path().to_owned();
+
+        assert!(temp_path.exists(), "could not make temp directory");
+
+        let temp_path_string = temp_path
+            .as_os_str()
+            .to_str()
+            .expect("cant get temp path string")
+            .to_owned();
+
+        Self {
+            temp_dir,
+            temp_path,
+            temp_path_string,
+            test_main_config_path: None,
+        }
+    }
+}
+
+impl TestData {
+    pub fn make_configs(&mut self) {
+        let mut config_path = self.temp_path.clone();
+
+        config_path.push("skel");
+
+        fs::create_dir_all(&config_path)
+            .expect("could not make test config dir");
+
+        config_path.push("config.toml");
+
+        fs::write(&config_path, TEST_CONFIG)
+            .expect("was not able to make test config");
+
+        self.test_main_config_path = Some(config_path);
+
+        let mut projects_path = self.temp_path.clone();
+
+        projects_path.push("projects");
+
+        fs::create_dir_all(projects_path).unwrap();
+
+        let mut include_file = self.temp_path.clone();
+
+        include_file.push(TEST_INCLUDE_NAME);
+
+        fs::write(include_file, TEST_INCLUDE_STR)
+            .expect("was not able to make TEST_INCLUDE_STR");
+
+        let mut test_skeleton = self.temp_path.clone();
+
+        test_skeleton.push("projects");
+
+        test_skeleton.push(TEST_SKEL_NAME);
+
+        fs::write(test_skeleton, TEST_SKEL)
+            .expect("was not able to make the test skeleton");
+
+        env::set_var("XDG_CONFIG_HOME", &self.temp_path_string);
+    }
+}
+
+pub fn test_args() -> SkelArgs {
+    SkelArgs {
+        skeleton: Some(String::from("t")),
+        name: Some(String::from("test_project")),
+        dry_run: true,
+        ..Default::default()
+    }
 }
