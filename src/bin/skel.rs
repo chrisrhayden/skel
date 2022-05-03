@@ -10,7 +10,7 @@ use skel::{
 
 fn get_root(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
     if let Some(diff_root) = &args.different_root {
-        let diff_root_path = PathBuf::from(diff_root);
+        let diff_root_path = PathBuf::from(diff_root).canonicalize()?;
 
         if diff_root_path.is_dir() {
             Ok(diff_root_path)
@@ -31,14 +31,10 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let mut root_string = get_root(&args)?;
 
-    let name = match args.name.as_ref() {
-        None => {
-            return Err(Box::from(String::from(
-                "some how did not gate a name to use",
-            )))
-        }
-        Some(value) => value,
-    };
+    let name = args
+        .name
+        .as_ref()
+        .ok_or("some how did not gate a name to use")?;
 
     root_string.push(name);
 
