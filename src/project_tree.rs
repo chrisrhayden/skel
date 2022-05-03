@@ -17,9 +17,9 @@ struct TemplateFile {
 }
 
 struct SkelTree<'a> {
-    templates: HashSet<TemplateFile>,
-    files: HashSet<PathBuf>,
-    dirs: HashSet<PathBuf>,
+    templates: Option<HashSet<TemplateFile>>,
+    files: Option<HashSet<PathBuf>>,
+    dirs: Option<HashSet<PathBuf>>,
     build: Option<&'a str>,
     build_first: bool,
 }
@@ -84,27 +84,27 @@ fn resolved_template(
 // resolve all the templates and add them to a hash set
 fn resolve_templates(
     run_conf: &RunConfig,
-) -> Result<HashSet<TemplateFile>, Box<dyn Error>> {
-    let mut resolved_templates = HashSet::new();
-
+) -> Result<Option<HashSet<TemplateFile>>, Box<dyn Error>> {
     if let Some(templates) = run_conf.skel_conf.templates.as_ref() {
+        let mut resolved_templates = HashSet::new();
         for template in templates {
             let new_template = resolved_template(template, run_conf)?;
 
             resolved_templates.insert(new_template);
         }
+        Ok(Some(resolved_templates))
+    } else {
+        Ok(None)
     }
-
-    Ok(resolved_templates)
 }
 
 // add all the dirs to a hash set
 fn resolve_dirs(
     run_conf: &RunConfig,
-) -> Result<HashSet<PathBuf>, Box<dyn Error>> {
-    let mut resolved_dirs = HashSet::new();
-
+) -> Result<Option<HashSet<PathBuf>>, Box<dyn Error>> {
     if let Some(dirs) = run_conf.skel_conf.dirs.as_ref() {
+        let mut resolved_dirs = HashSet::new();
+
         for dir in dirs {
             let mut dir_path = run_conf.root_path.clone();
 
@@ -112,22 +112,25 @@ fn resolve_dirs(
 
             resolved_dirs.insert(dir_path);
         }
-    }
 
-    Ok(resolved_dirs)
+        Ok(Some(resolved_dirs))
+    } else {
+        Ok(None)
+    }
 }
+
+type FilesResult =
+    Result<Option<(Vec<PathBuf>, HashSet<PathBuf>)>, Box<dyn Error>>;
 
 // add all the files to a hash set and return the set along with a vec of the
 // parent dirs
 //
 // the parent dirs will be added to the dir hash set
-fn resolve_files(
-    run_conf: &RunConfig,
-) -> Result<(Vec<PathBuf>, HashSet<PathBuf>), Box<dyn Error>> {
-    let mut resolved_files = HashSet::new();
-    let mut resolved_dirs = vec![];
-
+fn resolve_files(run_conf: &RunConfig) -> FilesResult {
     if let Some(files) = run_conf.skel_conf.files.as_ref() {
+        let mut resolved_files = HashSet::new();
+        let mut resolved_dirs = vec![];
+
         for file in files {
             let mut file_path = run_conf.root_path.clone();
 
@@ -140,9 +143,10 @@ fn resolve_files(
             resolved_files.insert(file_path);
             resolved_dirs.push(parent);
         }
+        Ok(Some((resolved_dirs, resolved_files)))
+    } else {
+        Ok(None)
     }
-
-    Ok((resolved_dirs, resolved_files))
 }
 
 fn make_tree(skel_tree: &SkelTree) -> Result<(), Box<dyn Error>> {
@@ -150,16 +154,22 @@ fn make_tree(skel_tree: &SkelTree) -> Result<(), Box<dyn Error>> {
         run_build_script(skel_tree.build.unwrap());
     }
 
-    for dir in &skel_tree.dirs {
-        fs::create_dir_all(dir)?;
+    if let Some(ref dirs) = skel_tree.dirs {
+        for dir in dirs {
+            fs::create_dir_all(dir)?;
+        }
     }
 
-    for file in &skel_tree.files {
-        fs::File::create(file)?;
+    if let Some(ref files) = skel_tree.files {
+        for file in files {
+            fs::File::create(file)?;
+        }
     }
 
-    for template in &skel_tree.templates {
-        fs::write(&template.path, &template.template)?;
+    if let Some(ref templates) = skel_tree.templates {
+        for template in templates {
+            fs::write(&template.path, &template.template)?;
+        }
     }
 
     if skel_tree.build.is_some() && !skel_tree.build_first {
@@ -178,26 +188,33 @@ fn print_tree(root: &Path, skel_tree: &SkelTree) {
     }
 
     println!("would make in to -> {}", root.as_os_str().to_str().unwrap());
-    for dir in &skel_tree.dirs {
-        println!("  dir  -> {}", dir.as_os_str().to_str().unwrap());
-    }
 
-    for file in &skel_tree.files {
-        println!("  file -> {}", file.as_os_str().to_str().unwrap());
-    }
-
-    for template in &skel_tree.templates {
-        println!("  ------");
-        println!(
-            "  template -> {}",
-            template.path.as_os_str().to_str().unwrap()
-        );
-
-        for line in template.template.lines() {
-            println!("    {}", line);
+    if let Some(ref dirs) = skel_tree.dirs {
+        for dir in dirs {
+            println!("  dir  -> {}", dir.as_os_str().to_str().unwrap());
         }
+    }
 
-        println!("  ------");
+    if let Some(ref files) = skel_tree.files {
+        for file in files {
+            println!("  file -> {}", file.as_os_str().to_str().unwrap());
+        }
+    }
+
+    if let Some(ref templates) = skel_tree.templates {
+        for template in templates {
+            println!("  ------");
+            println!(
+                "  template -> {}",
+                template.path.as_os_str().to_str().unwrap()
+            );
+
+            for line in template.template.lines() {
+                println!("    {}", line);
+            }
+
+            println!("  ------");
+        }
     }
 
     if let Some(build) = skel_tree.build {
@@ -219,11 +236,21 @@ pub fn make_project_tree(
 
     let mut dirs = resolve_dirs(run_conf)?;
 
-    let (parent_dirs, files) = resolve_files(run_conf)?;
+    let files = match resolve_files(run_conf)? {
+        None => None,
+        Some((parent_dirs, files)) => {
+            if let Some(ref mut dirs) = dirs {
+                for dir in parent_dirs.into_iter() {
+                    dirs.insert(dir);
+                }
+            } else {
+                dirs =
+                    Some(parent_dirs.into_iter().collect::<HashSet<PathBuf>>());
+            }
 
-    for dir in parent_dirs.into_iter() {
-        dirs.insert(dir);
-    }
+            Some(files)
+        }
+    };
 
     let build_first = run_conf.skel_conf.build_first.unwrap_or(false);
 
