@@ -33,21 +33,21 @@ skeletons), or a single project file. see [config](#config) for more.
 ### help
 ```
 skel
+make a project from a skeleton defined in a toml file
 
 USAGE:
     skel [OPTIONS] [ARGS]
 
 ARGS:
-    <SKELETON>
-    <NAME>
+    <SKELETON>    the skeleton to make, can be the skeleton name or alias
+    <NAME>        the name of the new project to make
 
 OPTIONS:
-    -a, --alt-config-path <ALT_CONFIG_PATH>
-    -d, --dry-run
-    -D, --different-root <DIFFERENT_ROOT>
+    -a, --alt-config-path <ALT_CONFIG_PATH>    a path to a main config file
+    -d, --dry-run                              print out what will be done
+    -D, --different-root <DIFFERENT_ROOT>      a different root to make the project in to
     -h, --help                                 Print help information
-    -s, --skeleton-file <SKELETON_FILE>
-
+    -s, --skeleton-file <SKELETON_FILE>        a path to a skeleton file
 ```
 
 ### config
@@ -56,7 +56,7 @@ OPTIONS:
 skel needs at least a skeleton project to make (or whats the point). these
 skeletons are toml files that have a few options like `files` and `dirs` to make
 as well as a `build` script that will be run with bash and a series of
-`templates` to add text. all files will be templated.
+`templates` to add text. all files will can be templated with handle bar syntax.
 
 all paths will have the project root added in front so you just need to define
 paths as if they will be made in the project root
@@ -69,10 +69,10 @@ the skeleton variables:
   - files = list of strings: blank files to make
   - build = string: a string that becomes a build script
   - build_first = bool: if the build script should be run first
-  - templates = object {path: string, template: string, include: string} 
-      path: the path in the new project that the template should be made to
-      template: the text that should be written to the new file
-      include: a path to a file whose contents should be copied to the new file
+  - templates = object {path: string, template: string, include: string}
+      - path: the path in the new project that the template should be made to
+      - template: the text that should be written to the new file
+      - include: a path to a file whose contents should be copied to the new file
 
 the templating slugs:
   - {{root}} = the root project (e.g. /tmp/cool-cli-tool)
@@ -91,7 +91,6 @@ an example skeleton file looks like
 ```toml
 # you could skip `src` if you make `src/foo`
 dirs = [
-    "src",
     "src/foo"
 ]
 
@@ -103,10 +102,6 @@ files = [
 ]
 
 # a build script that will be run with bash
-#
-# unless no files are to be made the script will be run in the project root if
-# only the build variable is present the script will be run from the calling
-# directory or the project root given on the command line
 build = """
 # init the project
 echo "$PWD"
@@ -174,3 +169,8 @@ basic_javascript.aliases = ["js", "j"]
 new-python.path = "/path/to/python_project/python.toml"
 new-python.aliases = ["py", "p", "this_is_not_shorter"]
 ```
+
+## TODO
+
+- update the build script logic
+  - the program should cd in to the containing dir for the project
