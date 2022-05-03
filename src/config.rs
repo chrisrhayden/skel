@@ -14,18 +14,20 @@ use serde_json::{json, Value};
 
 use crate::{parse_args::SkelArgs, templating::instantiate_handlebars};
 
+/// the path and alias to find a skeleton file
 #[derive(Deserialize, Debug)]
 pub struct Skeleton {
     pub path: String,
     pub aliases: Vec<String>,
 }
 
-/// this main config for the program
+/// this is them main config for the program
 #[derive(Deserialize, Debug)]
 pub struct MainConfig {
     pub skeletons: HashMap<String, Skeleton>,
 }
 
+/// a file template
 #[derive(Deserialize, Default)]
 pub struct SkelTemplate {
     pub path: String,
@@ -33,6 +35,7 @@ pub struct SkelTemplate {
     pub include: Option<String>,
 }
 
+/// a skeleton
 #[derive(Deserialize, Default)]
 pub struct SkelConfig {
     pub dirs: Option<Vec<String>>,
@@ -42,6 +45,7 @@ pub struct SkelConfig {
     pub build_first: Option<bool>,
 }
 
+/// the needed data to make the project
 #[derive(Default)]
 pub struct RunConfig<'reg> {
     pub skel_conf: SkelConfig,
@@ -51,8 +55,9 @@ pub struct RunConfig<'reg> {
 }
 
 fn find_main_config_path(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
-    if let Some(config_string) = &args.alt_config_path {
-        let config_path = PathBuf::from(config_string);
+    // first check if an alternate config path is given
+    if let Some(ref config_string) = args.alt_config_path {
+        let config_path = PathBuf::from(config_string).canonicalize()?;
 
         if !config_path.is_file() {
             return Err(Box::from(format!(
@@ -62,6 +67,19 @@ fn find_main_config_path(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
         }
 
         Ok(config_path)
+    // else check if a skeleton_file is given to use the parent dir as the
+    // `{{config-dir}}`
+    } else if let Some(ref skeleton_file) = args.skeleton_file {
+        let config_path = PathBuf::from(skeleton_file).canonicalize()?;
+
+        if !config_path.is_file() {
+            return Err(Box::from(String::from(
+                "skeleton file given on the cli does not exists or is not a file",
+            )));
+        }
+
+        Ok(config_path)
+    // finally if neither are given then use the main config path
     } else {
         let xdg_config =
             env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME not set");
@@ -101,6 +119,7 @@ fn make_duplicate_err_msg(duplicates: &[Duplicate]) -> String {
 
         dup_str.push_str(&new_dup);
 
+        // dont add a new line for the last item
         if i != duplicates_len {
             dup_str.push('\n');
         }
@@ -235,16 +254,16 @@ fn find_skeleton_config_path(
     args: &SkelArgs,
     main_config: &MainConfig,
 ) -> Result<PathBuf, Box<dyn Error>> {
-    // a skeleton target or project or alias
-    let skel_path = if let Some(target) = args.skeleton.as_ref() {
-        let skel_path = skeleton_path_from_config(target, main_config)?;
-
-        PathBuf::from(skel_path)
     // a file given on the cli
-    } else if let Some(skeleton_file) = args.skeleton_file.as_ref() {
+    let skel_path = if let Some(skeleton_file) = args.skeleton_file.as_ref() {
         let skel_path = PathBuf::from(skeleton_file);
 
         skel_path.canonicalize()?
+    // a skeleton project or alias
+    } else if let Some(target) = args.skeleton.as_ref() {
+        let skel_path = skeleton_path_from_config(target, main_config)?;
+
+        PathBuf::from(skel_path)
     } else {
         return Err(Box::from(String::from(
             "did not get skeleton to make some how",
@@ -283,16 +302,9 @@ pub fn resolve_config<'reg>(
 ) -> Result<RunConfig<'reg>, Box<dyn Error>> {
     let main_config_path = find_main_config_path(args)?;
 
-    let main_config_dir = match main_config_path.parent() {
-        None => {
-            // NOTE: this probably isn't possible as we have already checked
-            // if the config exists
-            return Err(Box::from(String::from(
-                "could not get the parent dir for the main config",
-            )));
-        }
-        Some(value) => value,
-    };
+    let main_config_dir = main_config_path
+        .parent()
+        .ok_or("could not get the parent dir for the main config")?;
 
     let handle = instantiate_handlebars();
 
@@ -307,10 +319,14 @@ pub fn resolve_config<'reg>(
         "config-dir": main_config_dir.as_os_str().to_str().unwrap().to_string(),
     });
 
-    let main_config =
-        get_main_config(&main_config_path, &handle, &template_data)?;
+    let skel_config_path = if let Some(ref skeleton_file) = args.skeleton_file {
+        PathBuf::from(skeleton_file).canonicalize()?
+    } else {
+        let main_config =
+            get_main_config(&main_config_path, &handle, &template_data)?;
 
-    let skel_config_path = find_skeleton_config_path(args, &main_config)?;
+        find_skeleton_config_path(args, &main_config)?
+    };
 
     let skel_conf =
         make_skel_config(&skel_config_path, &handle, &template_data)?;
