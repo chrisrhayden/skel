@@ -34,9 +34,10 @@ fn run() -> Result<(), Box<dyn Error>> {
     let name = args
         .name
         .as_ref()
-        .ok_or("some how did not gate a name to use")?;
+        .ok_or("some how did not gate a name to use")?
+        .to_owned();
 
-    root_string.push(name);
+    root_string.push(&name);
 
     if !args.dry_run && metadata(&root_string).is_ok() {
         return Err(Box::from(format!(
@@ -45,7 +46,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         )));
     }
 
-    let config = resolve_config(&args, root_string)?;
+    let config = resolve_config(&args, root_string, name)?;
 
     make_project_tree(args.dry_run, &config)
 }
