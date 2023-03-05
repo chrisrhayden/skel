@@ -235,8 +235,6 @@ pub fn make_project_tree(
     dry_run: bool,
     run_conf: &RunConfig,
 ) -> Result<(), Box<dyn Error>> {
-    let templates = resolve_templates(run_conf)?;
-
     let mut dirs = resolve_dirs(run_conf)?;
 
     let files = match resolve_files(run_conf)? {
@@ -254,6 +252,36 @@ pub fn make_project_tree(
             Some(files)
         }
     };
+
+    let templates = resolve_templates(run_conf)?;
+
+    // TODO: this is bad and i feel bad
+    if let Some(ref templates) = templates {
+        if let Some(ref mut dirs) = dirs {
+            for template in templates.iter() {
+                // this really shouldn't fail
+                let parent = template
+                    .path
+                    .parent()
+                    .expect("could not get a parent from template path")
+                    .to_owned();
+
+                dirs.insert(parent);
+            }
+        } else {
+            dirs = Some(
+                templates
+                    .iter()
+                    .map(|t| {
+                        t.path
+                            .parent()
+                            .expect("did not get template parent")
+                            .to_owned()
+                    })
+                    .collect::<HashSet<PathBuf>>(),
+            );
+        }
+    }
 
     let build_first = run_conf.skel_conf.build_first.unwrap_or(false);
 
