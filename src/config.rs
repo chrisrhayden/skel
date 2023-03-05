@@ -10,8 +10,6 @@ use handlebars::Handlebars;
 
 use serde::Deserialize;
 
-use serde_json::{json, Value};
-
 use crate::{parse_args::SkelArgs, templating::instantiate_handlebars};
 
 /// the path and alias to find a skeleton file
@@ -50,46 +48,8 @@ pub struct SkelConfig {
 pub struct RunConfig<'reg> {
     pub skel_conf: SkelConfig,
     pub root_path: PathBuf,
-    pub template_data: Value,
+    pub template_data: HashMap<String, String>,
     pub handle: Handlebars<'reg>,
-}
-
-// get that path to the main config
-fn get_main_config_path(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
-    // first check if an alternate config path is given
-    let main_config_path = if let Some(ref config_string) = args.alt_config_path
-    {
-        PathBuf::from(config_string).canonicalize()?
-
-    // else check if a skeleton_file is given to use the parent dir as the
-    // `{{config-dir}}`
-    } else if let Some(ref skeleton_file) = args.skeleton_file {
-        PathBuf::from(skeleton_file).canonicalize()?
-
-    // finally if neither are given then use the main config path
-    } else {
-        let xdg_config =
-            env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME not set");
-
-        let mut xdg_config_path = PathBuf::from(&xdg_config);
-        xdg_config_path.push("skel");
-
-        xdg_config_path.push("config.toml");
-
-        xdg_config_path
-    };
-
-    if main_config_path.is_file() {
-        Ok(main_config_path)
-    } else {
-        Err(Box::from(format!(
-            "given config path does not exist or is not a file {}",
-            main_config_path
-                .as_os_str()
-                .to_str()
-                .expect("cant get main_config_path to print")
-        )))
-    }
 }
 
 // a struct to hold duplicate values in a main config
@@ -113,7 +73,7 @@ fn make_duplicate_err_msg(duplicates: &[Duplicate]) -> String {
 
         dup_str.push_str(&new_dup);
 
-        // dont add a new line for the last item
+        // don't add a new line for the last item
         if i != duplicates_len {
             dup_str.push('\n');
         }
@@ -124,11 +84,11 @@ fn make_duplicate_err_msg(duplicates: &[Duplicate]) -> String {
 
 // check for duplicates in the main config
 //
-// NOTE: it would be more efficient to check for the target skeleton in this function
-// but whatever
+// NOTE: it would be more efficient to check for the target skeleton in this
+// function but whatever
 fn check_config(config: &MainConfig) -> Result<(), Box<dyn Error>> {
     // collect all the skeletons in to a vec so we can iterate over them in
-    // order, this is kinda waist but it is also the easiest
+    // order, this is kind of a waist but it is also the easiest
     let key_alias: Vec<(&String, &Skeleton)> =
         config.skeletons.iter().collect();
 
@@ -138,8 +98,9 @@ fn check_config(config: &MainConfig) -> Result<(), Box<dyn Error>> {
     // following ones checking if there any duplicates
     //
     // TODO: rephrase this
-    // we cant skip past the previous skeletons in the inner loop as the
-    // previous skeletons have already checked if they are duplicates
+    // we can skip past the previous skeletons in the inner loop as the
+    // previous skeletons have already been checked if there are duplicates
+    // as we loop over all following alias
     for (i, (key_1, skeleton_1)) in key_alias.iter().enumerate() {
         for (key_2, skeleton_2) in key_alias.iter().skip(i + 1) {
             let mut duplicate: Option<Duplicate> = None;
@@ -188,11 +149,40 @@ fn check_config(config: &MainConfig) -> Result<(), Box<dyn Error>> {
     }
 }
 
-/// get the main config file from a given path and return it
+// get that path to the main config
+fn get_main_config_path(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
+    // first check if an alternate config path is given
+    let main_config_path = if let Some(ref config_string) = args.alt_config_path
+    {
+        PathBuf::from(config_string).canonicalize()?
+
+    // finally if neither are given then use the main config path
+    } else {
+        let xdg_config = env::var("XDG_CONFIG_HOME")?;
+
+        let mut xdg_config_path = PathBuf::from(&xdg_config);
+        xdg_config_path.push("skel");
+
+        xdg_config_path.push("config.toml");
+
+        xdg_config_path.canonicalize()?
+    };
+
+    if main_config_path.is_file() {
+        Ok(main_config_path)
+    } else {
+        Err(Box::from(format!(
+            "given config path does not exist or is not a file {}",
+            main_config_path.display()
+        )))
+    }
+}
+
+// get the main config file from a given path and return it
 fn get_main_config(
     main_config_path: &Path,
     handle: &Handlebars,
-    template_data: &Value,
+    template_data: &HashMap<String, String>,
 ) -> Result<MainConfig, Box<dyn Error>> {
     let config_string = fs::read_to_string(main_config_path)?;
 
@@ -240,7 +230,7 @@ fn skeleton_path_from_config(
 }
 
 // find the skeleton config path and check if the file exists
-fn find_skeleton_config_path(
+fn get_skeleton_config_path(
     args: &SkelArgs,
     main_config: &MainConfig,
 ) -> Result<PathBuf, Box<dyn Error>> {
@@ -265,7 +255,7 @@ fn find_skeleton_config_path(
     } else {
         Err(Box::from(format!(
             "skeleton file does not exist or is not a file {}",
-            skel_path.as_os_str().to_str().unwrap()
+            skel_path.to_string_lossy().to_string()
         )))
     }
 }
@@ -273,7 +263,7 @@ fn find_skeleton_config_path(
 fn make_skel_config<P: AsRef<Path>>(
     skel_config_path: P,
     handle: &Handlebars,
-    template_data: &Value,
+    template_data: &HashMap<String, String>,
 ) -> Result<SkelConfig, Box<dyn Error>> {
     let skel_config_buf = fs::read_to_string(skel_config_path)?;
 
@@ -307,12 +297,16 @@ pub fn resolve_config<'reg>(
     let handle = instantiate_handlebars();
 
     // NOTE: its probably rare for the unwraps to fail
-    // NOTE: there probably a better way to make json but whatever
-    let template_data = json!({
-        "name": name,
-        "root": root_path.as_os_str().to_str().unwrap().to_string(),
-        "config-dir": main_config_dir.as_os_str().to_str().unwrap().to_string(),
-    });
+    let mut template_data: HashMap<String, String> = HashMap::new();
+
+    template_data.insert("name".to_string(), name);
+    template_data
+        .insert("root".to_string(), root_path.to_string_lossy().to_string());
+
+    template_data.insert(
+        "config-dir".to_string(),
+        main_config_dir.to_string_lossy().to_string(),
+    );
 
     let skel_config_path = if let Some(ref skeleton_file) = args.skeleton_file {
         PathBuf::from(skeleton_file).canonicalize()?
@@ -320,8 +314,17 @@ pub fn resolve_config<'reg>(
         let main_config =
             get_main_config(&main_config_path, &handle, &template_data)?;
 
-        find_skeleton_config_path(args, &main_config)?
+        get_skeleton_config_path(args, &main_config)?
     };
+
+    template_data.insert(
+        "skel-dir".to_string(),
+        skel_config_path
+            .parent()
+            .unwrap()
+            .to_string_lossy()
+            .to_string(),
+    );
 
     let skel_conf =
         make_skel_config(&skel_config_path, &handle, &template_data)?;
@@ -494,11 +497,14 @@ mod test {
                 "test_project".to_string(),
             ];
 
-            let template_data = json!({
-                "root": "".to_string(),
-                "name": "test_project".to_string(),
-                "config-dir": test_data.temp_path_string.clone(),
-            });
+            let mut template_data = HashMap::new();
+            template_data.insert("root".to_string(), "".to_string());
+            template_data
+                .insert("name".to_string(), "test_project".to_string());
+            template_data.insert(
+                "config-dir".to_string(),
+                test_data.temp_path_string.clone(),
+            );
 
             let handle = instantiate_handlebars();
 
@@ -592,7 +598,7 @@ mod test {
         hand_made_skel_path.push("projects");
         hand_made_skel_path.push(test_utils::TEST_SKEL_NAME);
 
-        match find_skeleton_config_path(&args, &main_config) {
+        match get_skeleton_config_path(&args, &main_config) {
             Ok(config_dir) => assert_eq!(
                 config_dir, hand_made_skel_path,
                 "did not make skeleton path"
@@ -624,7 +630,7 @@ mod test {
 
         fs::File::create(&hand_made_skel_path).unwrap();
 
-        match find_skeleton_config_path(&args, &main_config) {
+        match get_skeleton_config_path(&args, &main_config) {
             Ok(config_dir) => {
                 assert_eq!(
                     config_dir, hand_made_skel_path,
@@ -641,11 +647,13 @@ mod test {
 
         test_data.make_configs();
 
-        let template_data = json!({
-            "root": "".to_string(),
-            "name": "test_project".to_string(),
-            "config-dir": test_data.temp_path_string.clone(),
-        });
+        let mut template_data = HashMap::new();
+        template_data.insert("root".to_string(), "".to_string());
+        template_data.insert("name".to_string(), "test_project".to_string());
+        template_data.insert(
+            "config-dir".to_string(),
+            test_data.temp_path_string.clone(),
+        );
 
         let handle = instantiate_handlebars();
 
@@ -662,11 +670,11 @@ mod test {
 
     #[test]
     fn test_get_skel_config_does_not_exists() {
-        let template_data = json!({
-            "root": "".to_string(),
-            "name": "test_project".to_string(),
-            "config-dir": "test_config_dir".to_string(),
-        });
+        let mut template_data = HashMap::new();
+        template_data.insert("root".to_string(), "".to_string());
+        template_data.insert("name".to_string(), "test_project".to_string());
+        template_data
+            .insert("config-dir".to_string(), "test_config_dir".to_string());
 
         let handle = instantiate_handlebars();
 

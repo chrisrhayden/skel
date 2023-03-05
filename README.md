@@ -174,3 +174,4 @@ new-python.aliases = ["py", "p", "this_is_not_shorter"]
 
 - update the build script logic
   - the program should cd in to the containing dir for the project
+- allow this to be used without a main config
