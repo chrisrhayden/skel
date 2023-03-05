@@ -54,31 +54,18 @@ pub struct RunConfig<'reg> {
     pub handle: Handlebars<'reg>,
 }
 
-fn find_main_config_path(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
+// get that path to the main config
+fn get_main_config_path(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
     // first check if an alternate config path is given
-    if let Some(ref config_string) = args.alt_config_path {
-        let config_path = PathBuf::from(config_string).canonicalize()?;
+    let main_config_path = if let Some(ref config_string) = args.alt_config_path
+    {
+        PathBuf::from(config_string).canonicalize()?
 
-        if !config_path.is_file() {
-            return Err(Box::from(format!(
-                "given config path does not exist or is not a file {}",
-                config_string
-            )));
-        }
-
-        Ok(config_path)
     // else check if a skeleton_file is given to use the parent dir as the
     // `{{config-dir}}`
     } else if let Some(ref skeleton_file) = args.skeleton_file {
-        let config_path = PathBuf::from(skeleton_file).canonicalize()?;
+        PathBuf::from(skeleton_file).canonicalize()?
 
-        if !config_path.is_file() {
-            return Err(Box::from(String::from(
-                "skeleton file given on the cli does not exists or is not a file",
-            )));
-        }
-
-        Ok(config_path)
     // finally if neither are given then use the main config path
     } else {
         let xdg_config =
@@ -89,12 +76,19 @@ fn find_main_config_path(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
 
         xdg_config_path.push("config.toml");
 
-        // NOTE: if the file exist then the config dir also exists
-        if xdg_config_path.is_file() {
-            Ok(xdg_config_path)
-        } else {
-            Err(Box::from(String::from("main config does not exist")))
-        }
+        xdg_config_path
+    };
+
+    if main_config_path.is_file() {
+        Ok(main_config_path)
+    } else {
+        Err(Box::from(format!(
+            "given config path does not exist or is not a file {}",
+            main_config_path
+                .as_os_str()
+                .to_str()
+                .expect("cant get main_config_path to print")
+        )))
     }
 }
 
@@ -147,9 +141,9 @@ fn check_config(config: &MainConfig) -> Result<(), Box<dyn Error>> {
     // we cant skip past the previous skeletons in the inner loop as the
     // previous skeletons have already checked if they are duplicates
     for (i, (key_1, skeleton_1)) in key_alias.iter().enumerate() {
-        let mut duplicate: Option<Duplicate> = None;
-
         for (key_2, skeleton_2) in key_alias.iter().skip(i + 1) {
+            let mut duplicate: Option<Duplicate> = None;
+
             // NOTE: i guess multiple keys will be a parsing error
             if key_1 == key_2 {
                 let dup = Duplicate {
@@ -178,10 +172,10 @@ fn check_config(config: &MainConfig) -> Result<(), Box<dyn Error>> {
                     }
                 }
             }
-        }
 
-        if let Some(duplicate) = duplicate {
-            duplicates.push(duplicate);
+            if let Some(duplicate) = duplicate {
+                duplicates.push(duplicate);
+            }
         }
     }
 
@@ -204,12 +198,10 @@ fn get_main_config(
 
     let templated_config_string = handle
         .render_template(&config_string, &template_data)
-        // NOTE: this could be handled more elegantly
         .expect("could not template main config");
 
     let config: MainConfig = toml::from_str(&templated_config_string)
-        // NOTE: this could be handled more elegantly
-        .expect("config not formatted correctly");
+        .expect("main config not formatted correctly");
 
     check_config(&config)?;
 
@@ -239,14 +231,12 @@ fn skeleton_path_from_config(
             skel_path
         };
 
-    if let Some(skel_path) = skel_config_path {
-        Ok(skel_path)
-    } else {
-        Err(Box::from(format!(
+    skel_config_path.ok_or_else(|| {
+        Box::from(format!(
             "did not find matching skeleton or alias for {}",
             target
-        )))
-    }
+        ))
+    })
 }
 
 // find the skeleton config path and check if the file exists
@@ -292,24 +282,29 @@ fn make_skel_config<P: AsRef<Path>>(
         .expect("was not able to template skeleton");
 
     toml::from_str(&templated_config_string).map_err(|e| {
-        Box::from(format!("Error: SkelConfig not formatted correctly {}", e))
+        Box::from(format!("skeleton config not formatted correctly {}", e))
     })
 }
 
+/// resolve config
+///
+/// # Arguments
+///
+/// * `args` - cli args
+/// * `root_path` - the path to make skel in to
+/// * `name` - the name of the new project
 pub fn resolve_config<'reg>(
     args: &SkelArgs,
     root_path: PathBuf,
+    name: String,
 ) -> Result<RunConfig<'reg>, Box<dyn Error>> {
-    let main_config_path = find_main_config_path(args)?;
+    let main_config_path = get_main_config_path(args)?;
 
     let main_config_dir = main_config_path
         .parent()
         .ok_or("could not get the parent dir for the main config")?;
 
     let handle = instantiate_handlebars();
-
-    // NOTE: we have already checked if this value exists when parsing args
-    let name = args.name.as_ref().unwrap().to_owned();
 
     // NOTE: its probably rare for the unwraps to fail
     // NOTE: there probably a better way to make json but whatever
@@ -414,7 +409,7 @@ mod test {
 
         test_config_path.push("skel/config.toml");
 
-        match find_main_config_path(&test_args) {
+        match get_main_config_path(&test_args) {
             Ok(config_path) => {
                 assert_eq!(config_path, test_config_path);
             }
@@ -438,7 +433,7 @@ mod test {
 
         test_args.alt_config_path =
             Some(test_config_path.as_os_str().to_str().unwrap().to_string());
-        match find_main_config_path(&test_args) {
+        match get_main_config_path(&test_args) {
             Ok(config_path) => {
                 assert_eq!(config_path, test_config_path);
             }
@@ -451,7 +446,7 @@ mod test {
         let test_args = test_utils::test_args();
 
         assert!(
-            find_main_config_path(&test_args).is_err(),
+            get_main_config_path(&test_args).is_err(),
             "some how found a config?"
         );
     }
