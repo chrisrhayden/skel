@@ -14,7 +14,7 @@ _projects() {
     local project_names
 
     projects=( \
-        $(/home/chris/proj/skel/target/debug/_skel_completion) \
+        $(_skel_completion) \
     )
 
     _values 'projects' ${projects[@]}

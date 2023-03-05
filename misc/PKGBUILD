@@ -24,7 +24,7 @@ package() {
       "${srcdir}/${pkgname%-git}/target/release/_skel_completion" \
       "${pkgdir}/usr/bin/_skel_completion"
 
-    install -D -o root -g root -m 644 "${srcdir}/${pkgname%-git}/docs/_${pkgname}" \
+   install -D -o root -g root -m 644 "${srcdir}/${pkgname%-git}/docs/_${pkgname}" \
         "${pkgdir}/usr/share/zsh/site-functions/_${pkgname}"
 }
 
