@@ -16,11 +16,14 @@ struct TemplateFile {
     template: String,
 }
 
-struct SkelTree<'a> {
-    templates: Option<HashSet<TemplateFile>>,
-    files: Option<HashSet<PathBuf>>,
+// this is a resolved skeleton
+// this is mostly for `dry_run` so we dont print out duplicates
+// this isnt really necisery but is nice
+struct SkelTree<'build> {
     dirs: Option<HashSet<PathBuf>>,
-    build: Option<&'a str>,
+    files: Option<HashSet<PathBuf>>,
+    templates: Option<HashSet<TemplateFile>>,
+    build: Option<&'build str>,
     build_first: bool,
 }
 
@@ -220,7 +223,7 @@ fn print_tree(root: &Path, skel_tree: &SkelTree) {
     if let Some(build) = skel_tree.build {
         println!("  build first = {}", skel_tree.build_first);
 
-        println!("  ------\n    {}\n  ------", build);
+        println!("    {}\n  ------", build);
     }
 }
 
