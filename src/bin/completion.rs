@@ -3,15 +3,24 @@ use std::{env, error::Error, fs, path::PathBuf, process};
 use skel::config::MainConfig;
 
 fn get_main_config() -> Result<PathBuf, Box<dyn Error>> {
-    let xdg_config =
-        env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME not set");
+    let mut xdg_config = match env::var("XDG_CONFIG_HOME") {
+        Ok(path) => PathBuf::from(path),
+        _ => {
+            let home = env::var("HOME").expect("can not find HOME dir");
 
-    let mut xdg_config_path = PathBuf::from(&xdg_config);
-    xdg_config_path.push("skel");
-    xdg_config_path.push("config.toml");
+            let mut home_path = PathBuf::from(home);
 
-    if xdg_config_path.is_file() {
-        Ok(xdg_config_path)
+            home_path.push(".config");
+
+            home_path
+        }
+    };
+
+    xdg_config.push("skel");
+    xdg_config.push("config.toml");
+
+    if xdg_config.is_file() {
+        Ok(xdg_config)
     } else {
         Err(Box::from(String::from("main config does not exist")))
     }

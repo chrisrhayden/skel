@@ -184,33 +184,27 @@ fn make_tree(skel_tree: &SkelTree) -> Result<(), Box<dyn Error>> {
 
 fn print_tree(root: &Path, skel_tree: &SkelTree) {
     if root.exists() {
-        println!(
-            "\x1b[33mWarning {} already exists\x1b[0m\n",
-            root.as_os_str().to_str().unwrap()
-        );
+        println!("\x1b[33mWarning {} already exists\x1b[0m\n", root.display());
     }
 
-    println!("would make in to -> {}", root.as_os_str().to_str().unwrap());
+    println!("would make in to -> {}", root.display());
 
     if let Some(ref dirs) = skel_tree.dirs {
         for dir in dirs {
-            println!("  dir  -> {}", dir.as_os_str().to_str().unwrap());
+            println!("  dir  -> {}", dir.display());
         }
     }
 
     if let Some(ref files) = skel_tree.files {
         for file in files {
-            println!("  file -> {}", file.as_os_str().to_str().unwrap());
+            println!("  file -> {}", file.display());
         }
     }
 
     if let Some(ref templates) = skel_tree.templates {
         for template in templates {
             println!("  ------");
-            println!(
-                "  template -> {}",
-                template.path.as_os_str().to_str().unwrap()
-            );
+            println!("  template -> {}", template.path.display());
 
             for line in template.template.lines() {
                 println!("    {}", line);
@@ -223,7 +217,10 @@ fn print_tree(root: &Path, skel_tree: &SkelTree) {
     if let Some(build) = skel_tree.build {
         println!("  build first = {}", skel_tree.build_first);
 
-        println!("    {}\n  ------", build);
+        for line in build.lines() {
+            println!("    {line}");
+        }
+        println!("  ------");
     }
 }
 

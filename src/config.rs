@@ -158,14 +158,23 @@ fn get_main_config_path(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
 
     // finally if neither are given then use the main config path
     } else {
-        let xdg_config = env::var("XDG_CONFIG_HOME")?;
+        let xdg_config = match env::var("XDG_CONFIG_HOME") {
+            Ok(path) => PathBuf::from(path),
+            _ => {
+                let path = env::var("HOME").expect("could not get home var");
 
-        let mut xdg_config_path = PathBuf::from(&xdg_config);
-        xdg_config_path.push("skel");
+                let mut home_path = PathBuf::from(home);
 
-        xdg_config_path.push("config.toml");
+                home_path.push(".config");
+                home_path
+            }
+        };
 
-        xdg_config_path.canonicalize()?
+        xdg_config.push("skel");
+
+        xdg_config.push("config.toml");
+
+        xdg_config.canonicalize()?
     };
 
     if main_config_path.is_file() {
