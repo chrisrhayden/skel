@@ -158,7 +158,7 @@ fn get_main_config_path(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
 
     // finally if neither are given then use the main config path
     } else {
-        let xdg_config = match env::var("XDG_CONFIG_HOME") {
+        let mut xdg_config = match env::var("XDG_CONFIG_HOME") {
             Ok(path) => PathBuf::from(path),
             _ => {
                 let home = env::var("HOME").expect("could not get home var");
