@@ -88,7 +88,7 @@ fn make_duplicate_err_msg(duplicates: &[Duplicate]) -> String {
 // function but whatever
 fn check_config(config: &MainConfig) -> Result<(), Box<dyn Error>> {
     // collect all the skeletons in to a vec so we can iterate over them in
-    // order, this is kind of a waist but it is also the easiest
+    // order, this is kinda bad but it is also the easiest
     let key_alias: Vec<(&String, &Skeleton)> =
         config.skeletons.iter().collect();
 
@@ -97,10 +97,8 @@ fn check_config(config: &MainConfig) -> Result<(), Box<dyn Error>> {
     // iterate over all the skeletons in the main config then iterate over the
     // following ones checking if there any duplicates
     //
-    // TODO: rephrase this
     // we can skip past the previous skeletons in the inner loop as the
-    // previous skeletons have already been checked if there are duplicates
-    // as we loop over all following alias
+    // previous skeletons have already been checked for duplicates
     for (i, (key_1, skeleton_1)) in key_alias.iter().enumerate() {
         for (key_2, skeleton_2) in key_alias.iter().skip(i + 1) {
             let mut duplicate: Option<Duplicate> = None;
@@ -154,18 +152,21 @@ fn get_main_config_path(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
     // first check if an alternate config path is given
     let main_config_path = if let Some(ref config_string) = args.alt_config_path
     {
-        PathBuf::from(config_string).canonicalize()?
+        PathBuf::from(config_string)
 
-    // finally if neither are given then use the main config path
+    // else try and use xdg_config_home
     } else {
         let mut xdg_config = match env::var("XDG_CONFIG_HOME") {
             Ok(path) => PathBuf::from(path),
             _ => {
-                let home = env::var("HOME").expect("could not get home var");
+                // this is fine on linux and probably mac
+                // but will fail on windows
+                let home = env::var("HOME")?;
 
                 let mut home_path = PathBuf::from(home);
 
                 home_path.push(".config");
+
                 home_path
             }
         };
@@ -174,7 +175,7 @@ fn get_main_config_path(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
 
         xdg_config.push("config.toml");
 
-        xdg_config.canonicalize()?
+        xdg_config
     };
 
     if main_config_path.is_file() {
@@ -195,12 +196,10 @@ fn get_main_config(
 ) -> Result<MainConfig, Box<dyn Error>> {
     let config_string = fs::read_to_string(main_config_path)?;
 
-    let templated_config_string = handle
-        .render_template(&config_string, &template_data)
-        .expect("could not template main config");
+    let templated_config_string =
+        handle.render_template(&config_string, &template_data)?;
 
-    let config: MainConfig = toml::from_str(&templated_config_string)
-        .expect("main config not formatted correctly");
+    let config: MainConfig = toml::from_str(&templated_config_string)?;
 
     check_config(&config)?;
 
@@ -247,7 +246,7 @@ fn get_skeleton_config_path(
     let skel_path = if let Some(skeleton_file) = args.skeleton_file.as_ref() {
         let skel_path = PathBuf::from(skeleton_file);
 
-        skel_path.canonicalize()?
+        skel_path
     // a skeleton project or alias
     } else if let Some(target) = args.skeleton.as_ref() {
         let skel_path = skeleton_path_from_config(target, main_config)?;
@@ -305,10 +304,10 @@ pub fn resolve_config<'reg>(
 
     let handle = instantiate_handlebars();
 
-    // NOTE: its probably rare for the unwraps to fail
     let mut template_data: HashMap<String, String> = HashMap::new();
 
     template_data.insert("name".to_string(), name);
+
     template_data
         .insert("root".to_string(), root_path.to_string_lossy().to_string());
 
@@ -318,7 +317,7 @@ pub fn resolve_config<'reg>(
     );
 
     let skel_config_path = if let Some(ref skeleton_file) = args.skeleton_file {
-        PathBuf::from(skeleton_file).canonicalize()?
+        PathBuf::from(skeleton_file)
     } else {
         let main_config =
             get_main_config(&main_config_path, &handle, &template_data)?;

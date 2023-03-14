@@ -10,7 +10,7 @@ use skel::{
 
 fn get_root(args: &SkelArgs) -> Result<PathBuf, Box<dyn Error>> {
     if let Some(diff_root) = &args.different_root {
-        let diff_root_path = PathBuf::from(diff_root).canonicalize()?;
+        let diff_root_path = PathBuf::from(diff_root);
 
         if diff_root_path.is_dir() {
             Ok(diff_root_path)
