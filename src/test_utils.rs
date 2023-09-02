@@ -33,7 +33,7 @@ template = "this is a test template for {{name}}"
 
 [[templates]]
 path = "test_src/test_template_include_file.txt"
-include = "{{config-dir}}/projects/test_include_file.txt"
+include = "{{skel-dir}}/test_include_file.txt"
 "#;
 
 pub const TEST_INCLUDE_NAME: &str = "projects/test_include_file.txt";

@@ -4,6 +4,7 @@ use std::{
     error::Error,
     fs,
     path::{Path, PathBuf},
+    rc::Rc,
 };
 
 use handlebars::Handlebars;
@@ -444,6 +445,7 @@ mod test {
 
         test_args.alt_config_path =
             Some(test_config_path.as_os_str().to_str().unwrap().to_string());
+
         match get_main_config_path(&test_args) {
             Ok(config_path) => {
                 assert_eq!(config_path, test_config_path);
